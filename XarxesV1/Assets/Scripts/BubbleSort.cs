@@ -8,7 +8,8 @@ public class BubbleSort : MonoBehaviour
     float[] array;
     List<GameObject> mainObjects;
     public GameObject prefab;
-
+    Thread sortThread;
+    bool heightsDirty = true;
     void Start()
     {
         mainObjects = new List<GameObject>();
@@ -17,14 +18,18 @@ public class BubbleSort : MonoBehaviour
         {
             array[i] = (float)Random.Range(0, 1000)/100;
         }
-       
+
         //TO DO 4
         //Call the three previous functions in order to set up the exercise
+        logArray();
+        spawnObjs();
+        updateHeights();
+        //bubbleSort();
 
         //TO DO 5
         //Create a new thread using the function "bubbleSort" and start it.
-      
-
+        sortThread = new Thread(bubbleSort);
+        sortThread.Start();
     }
 
     void Update()
@@ -33,8 +38,12 @@ public class BubbleSort : MonoBehaviour
         //Call updateHeights() in order to update our object list.
         //Since we'll be calling UnityEngine functions to retrieve and change some data,
         //we can't call this function inside a Thread
-  
-
+        if (heightsDirty)
+        {
+            bool changed = updateHeights();
+            if (!changed && !sortThread.IsAlive)
+                heightsDirty = false;
+        }
     }
 
     //TO DO 5
@@ -67,6 +76,7 @@ public class BubbleSort : MonoBehaviour
 
         //TO DO 1
         //Simply show in the console what's inside our array.
+        text = string.Join(", ", array);
 
         Debug.Log(text);
     }
@@ -81,8 +91,9 @@ public class BubbleSort : MonoBehaviour
             //We have to separate the objs accordingly to their width, in which case we divide their position by 1000.
             //If you decide to make your objs wider, don't forget to up this value
 
-            Instantiate(prefab, new Vector3((float)i / 1000, 
+            GameObject obj =  Instantiate(prefab, new Vector3((float)i / 1000, 
                 this.gameObject.GetComponent<Transform>().position.y, 0), Quaternion.identity);
+            mainObjects.Add(obj);
         }
 
     }
@@ -98,7 +109,13 @@ public class BubbleSort : MonoBehaviour
         bool changed = false;
         for (int i = 0; i < array.Length; i++)
         {
- 
+            float value = array[i];
+            Vector3 currentScale = mainObjects[i].transform.localScale;
+            if(currentScale.y != value)
+            {
+                mainObjects[i].transform.localScale = new Vector3(currentScale.x,array[i], currentScale.z);
+                changed = true;
+            }
         }
         return changed;
     }
