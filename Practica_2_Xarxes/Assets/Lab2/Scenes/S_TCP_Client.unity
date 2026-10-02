@@ -128,7 +128,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 167353101}
-  - component: {fileID: 167353100}
+  - component: {fileID: 167353102}
   m_Layer: 0
   m_Name: SocketsTCPClient
   m_TagString: Untagged
@@ -136,22 +136,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &167353100
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 167353099}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b218437d5c15a7b4e96162d70831cbf6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SocketsTCPClient
-  serverIp: 127.0.0.1
-  port: 9050
-  userName: Player
-  autoStart: 0
 --- !u!4 &167353101
 Transform:
   m_ObjectHideFlags: 0
@@ -167,6 +151,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &167353102
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 167353099}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0bd41261ddbeb840a8a545280acec5d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NewSocketsTCPClient
+  serverIp: 127.0.0.1
+  port: 9050
+  userName: Player
+  autoStart: 1
 --- !u!1 &481956935
 GameObject:
   m_ObjectHideFlags: 0

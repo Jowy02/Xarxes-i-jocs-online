@@ -258,7 +258,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1740486849}
-  - component: {fileID: 1740486848}
+  - component: {fileID: 1740486850}
   m_Layer: 0
   m_Name: SocketsTCPServer
   m_TagString: Untagged
@@ -266,21 +266,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1740486848
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1740486847}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 85b3ef12bf36cf847b84896bb176e61f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SocketsTCPServer
-  port: 9050
-  serverName: MyServer
-  autoStart: 1
 --- !u!4 &1740486849
 Transform:
   m_ObjectHideFlags: 0
@@ -296,6 +281,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1740486850
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1740486847}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f452864940b38344b6aa8811d253fec, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NewSocketsTCPServer
+  port: 9050
+  serverName: MyServer
+  autoStart: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
