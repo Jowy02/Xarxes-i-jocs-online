@@ -28,6 +28,7 @@ public class NewSocketsTCPClient : MonoBehaviour
 
     // Message typed into the chat input field.
     string m_messageInput = "";
+    readonly List<string> m_players = new List<string>();
 
     public bool IsRunning
     {
@@ -79,6 +80,7 @@ public class NewSocketsTCPClient : MonoBehaviour
         }
 
         m_log.Clear();
+        m_players.Clear();
 
         Log("[CLIENT] Disconnected");
     }
@@ -273,6 +275,18 @@ public class NewSocketsTCPClient : MonoBehaviour
     void OnPacketReceived(byte[] data)
     {
         string message = Encoding.UTF8.GetString(data);
+
+        if (message.StartsWith("PLAYERS|"))
+        {
+            string list = message.Substring(8);
+
+            m_players.Clear();
+            if (list.Length > 0)
+                m_players.AddRange(list.Split(','));
+
+            return;
+        }
+
         if (message.StartsWith("DISC|"))
         {
             message = message.Substring(5).Trim();
@@ -420,6 +434,12 @@ public class NewSocketsTCPClient : MonoBehaviour
         }
 
         GUILayout.EndHorizontal();
+
+        GUILayout.Space(20);
+        GUILayout.Label("Players (" + m_players.Count + "):");
+        foreach (string p in m_players)
+            GUILayout.Label("  - " + p);
+
         GUILayout.Space(20);
         GUILayout.Label("Chat:");
 

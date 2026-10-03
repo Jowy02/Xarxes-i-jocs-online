@@ -166,7 +166,7 @@ MonoBehaviour:
   serverIp: 127.0.0.1
   port: 9050
   userName: Player
-  autoStart: 1
+  autoStart: 0
 --- !u!1 &481956935
 GameObject:
   m_ObjectHideFlags: 0

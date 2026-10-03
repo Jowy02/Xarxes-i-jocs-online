@@ -215,6 +215,9 @@ public class NewSocketsTCPServer : MonoBehaviour
             (string.IsNullOrEmpty(username)? "": ": " + username));
 
         CloseSocket(client);
+
+        if (!string.IsNullOrEmpty(username) && m_running)   
+            BroadcastPlayers();
     }
 
     // =============================================================================================
@@ -263,6 +266,16 @@ public class NewSocketsTCPServer : MonoBehaviour
 
         foreach (Socket client in clients)
             SendString(message,client);
+    }
+
+    void BroadcastPlayers()
+    {
+        string list;
+
+        lock (m_userNames)
+            list = string.Join(",", m_userNames.Values);
+
+        BroadcastMessage("PLAYERS|" + list, null);
     }
 
     // =============================================================================================
@@ -359,6 +372,7 @@ public class NewSocketsTCPServer : MonoBehaviour
             }
 
             Log("[SERVER] Player joined: " + username);
+            BroadcastPlayers();
 
             //Send all old messages to the new player.
             lock (m_messages)
