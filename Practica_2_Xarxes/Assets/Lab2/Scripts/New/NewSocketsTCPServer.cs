@@ -411,6 +411,12 @@ public class NewSocketsTCPServer : MonoBehaviour
             return;
         }
 
+        if (message.StartsWith("LEAVE:"))
+        {
+            // Do nothing, socket when closing will erase
+            return;
+        }
+
         Log("[SERVER] Unknown message: " +message);
     }
 
