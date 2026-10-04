@@ -62,6 +62,8 @@ public class NewSocketsTCPClient : MonoBehaviour
 
         m_running = false;
 
+        if (m_connection != null) SendString("LEAVE:");
+
         CloseSocket(m_connection);
         m_connection = null;
 
@@ -191,7 +193,7 @@ public class NewSocketsTCPClient : MonoBehaviour
         string message = m_messageInput.Trim();
 
         // Tell the server that this is a chat message.
-        SendString("CHAT|" + message);
+        SendString("CHAT:" + message);
 
         // Clear input field.
         m_messageInput = "";
@@ -269,14 +271,14 @@ public class NewSocketsTCPClient : MonoBehaviour
     void OnConnected()
     {
         // Tell the server who we are.
-        SendString("JOIN|" + userName);
+        SendString("JOIN:" + userName);
     }
 
     void OnPacketReceived(byte[] data)
     {
         string message = Encoding.UTF8.GetString(data);
 
-        if (message.StartsWith("PLAYERS|"))
+        if (message.StartsWith("PLAYERS:"))
         {
             string list = message.Substring(8);
 
@@ -287,7 +289,7 @@ public class NewSocketsTCPClient : MonoBehaviour
             return;
         }
 
-        if (message.StartsWith("DISC|"))
+        if (message.StartsWith("DISC:"))
         {
             message = message.Substring(5).Trim();
             Disconnect();

@@ -275,7 +275,7 @@ public class NewSocketsTCPServer : MonoBehaviour
         lock (m_userNames)
             list = string.Join(",", m_userNames.Values);
 
-        BroadcastMessage("PLAYERS|" + list, null);
+        BroadcastMessage("PLAYERS:" + list, null);
     }
 
     // =============================================================================================
@@ -356,7 +356,7 @@ public class NewSocketsTCPServer : MonoBehaviour
         // PLAYER JOIN
         // =========================================================================================
 
-        if (message.StartsWith("JOIN|"))
+        if (message.StartsWith("JOIN:"))
         {
             string username = message.Substring(5).Trim();
             lock (m_userNames)
@@ -364,7 +364,7 @@ public class NewSocketsTCPServer : MonoBehaviour
                 if (string.IsNullOrEmpty(username) || m_userNames.ContainsValue(username))
                 {
                     Log("[SERVER] Player join with empty username");
-                    SendString("DISC|Invalid user name", from);
+                    SendString("DISC:Invalid user name", from);
 
                     return;
                 }
@@ -388,7 +388,7 @@ public class NewSocketsTCPServer : MonoBehaviour
         // CHAT MESSAGE
         // =========================================================================================
 
-        if (message.StartsWith("CHAT|"))
+        if (message.StartsWith("CHAT:"))
         {
             string chatMessage = message.Substring(5).Trim();
 
@@ -398,7 +398,7 @@ public class NewSocketsTCPServer : MonoBehaviour
 
             lock (m_userNames) m_userNames.TryGetValue(from,out username);
 
-            string formattedMessage = username + ": " + chatMessage;
+            string formattedMessage = "CHAT:" + username + ": " + chatMessage;
 
             Log("[SERVER] Received: " + formattedMessage);
 
