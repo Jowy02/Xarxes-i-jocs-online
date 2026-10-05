@@ -27,6 +27,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     // Minigame variables
     float m_pingTimer = 0f;
     readonly Dictionary<string, GameObject> m_playerCapsules = new Dictionary<string, GameObject>();
+    string posMsg = "POS:{0:0},{0:0},{0:0}";
 
     // =============================================================================================
     // START / STOP
@@ -98,6 +99,7 @@ public class NewSocketsUDPClient : MonoBehaviour
         if (m_pingTimer <= 0)
         {
             SendString("PING:");
+            SendString(posMsg);
             m_pingTimer = 1f;
         }
 
@@ -114,8 +116,8 @@ public class NewSocketsUDPClient : MonoBehaviour
                 Vector3 point = ray.GetPoint(rayDistance);
 
                 // Format using InvariantCulture to force DOT as decimal separator
-                string posMsg = string.Format(CultureInfo.InvariantCulture, "POS:{0:F2},{1:F2},{2:F2}", point.x, point.y, point.z);
-                SendString(posMsg);
+                posMsg = string.Format(CultureInfo.InvariantCulture, "POS:{0:F2},{1:F2},{2:F2}", point.x, point.y, point.z);
+                //SendString(posMsg);
             }
         }
     }

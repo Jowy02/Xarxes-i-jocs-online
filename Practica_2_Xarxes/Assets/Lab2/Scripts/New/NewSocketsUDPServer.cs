@@ -133,6 +133,8 @@ public class NewSocketsUDPServer : MonoBehaviour
         if (isNewPlayer)
         {
             Log("[SERVER] NEW PLAYER CONNECTED: " + from.ToString());
+            
+            lock (m_knownClients) m_knownClients.Add(from);
         }
 
         if (text.StartsWith("PING:"))
@@ -147,11 +149,6 @@ public class NewSocketsUDPServer : MonoBehaviour
             Log("[SERVER] Movement from " + from.ToString() + " to coordinates: " + coords);
 
             string broadcastMsg = "POS:" + from.ToString() + ":" + coords;
-
-            lock (m_knownClients)
-            {
-                m_knownClients.Add(from);
-            }
 
             Broadcast(broadcastMsg);
         }
