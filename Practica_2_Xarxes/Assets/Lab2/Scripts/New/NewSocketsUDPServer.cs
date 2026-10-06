@@ -11,6 +11,9 @@ public class NewSocketsUDPServer : MonoBehaviour
 {
     public int port = 9050;
     public bool autoStart = true;
+    public bool showDebugUI = true;
+
+    private List<UDPPlayer> m_players = new List<UDPPlayer>();
 
     const int MaxPacketSize = 64 * 1024;
 
@@ -39,18 +42,33 @@ public class NewSocketsUDPServer : MonoBehaviour
         Application.runInBackground = true;
         if (autoStart) StartNetwork();
     }
-
-    public void StartNetwork()
+    public bool StartNetwork()
     {
-        if (m_running) return;
+        if (m_running) return true;
+
+        try
+        {
+            m_socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            m_socket.Bind(new IPEndPoint(IPAddress.Any, port));
+        }
+        catch (SocketException error)
+        {
+            Log("[SERVER] Couldn't start: " + error.SocketErrorCode);
+
+            if (m_socket != null) m_socket.Close();
+            m_socket = null;
+            return false;
+        }
+
         m_running = true;
 
         Thread t = new Thread(ServerThread);
         t.IsBackground = true;
         m_threads.Add(t);
         t.Start();
-    }
 
+        return true;
+    }
     public void Disconnect()
     {
         if (!m_running) return;
@@ -64,6 +82,7 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         lock (m_knownClients) m_knownClients.Clear();
         lock (m_lastSeen) m_lastSeen.Clear();
+        m_players.Clear();
 
         Log("[SERVER] Stopped");
     }
@@ -103,13 +122,11 @@ public class NewSocketsUDPServer : MonoBehaviour
 
                 foreach (EndPoint deadClient in toRemove)
                 {
-                    m_lastSeen.Remove(deadClient);
-                    lock (m_knownClients) m_knownClients.Remove(deadClient);
-
-                    Log("[SERVER] Timeout, kicking out: " + deadClient);
-
-                    Broadcast("DISC:" + deadClient.ToString());
+                    Log("[SERVER] Timeout: " + deadClient);
+                    RemovePlayer(deadClient);
                 }
+
+
             }
         }
     }
@@ -121,6 +138,12 @@ public class NewSocketsUDPServer : MonoBehaviour
     void ProcessMessage(byte[] data, EndPoint from)
     {
         string text = Encoding.UTF8.GetString(data);
+
+        if (text == "LEAVE:")
+        {
+            RemovePlayer(from);
+            return;
+        }
 
         // Check if it is a new player to log
         bool isNewPlayer = false;
@@ -135,6 +158,31 @@ public class NewSocketsUDPServer : MonoBehaviour
             Log("[SERVER] NEW PLAYER CONNECTED: " + from.ToString());
             
             lock (m_knownClients) m_knownClients.Add(from);
+        }
+
+        // =========================================================================================
+        // PLAYER JOIN
+        // =========================================================================================
+
+        if (text.StartsWith("JOIN:"))
+        {
+            string playerName = text.Substring(5).Trim();
+
+            if (string.IsNullOrEmpty(playerName)) return;
+
+            for (int i = 0; i < m_players.Count; i++)
+            {
+                if (m_players[i].endpoint.Equals(from)) return;
+            }
+
+            UDPPlayer player = new UDPPlayer(playerName, from);
+            m_players.Add(player);
+
+            Log("[SERVER] Player registered: " + player.name);
+            Log("[SERVER] Total players: " + m_players.Count);
+            SendPlayerList();
+
+            return;
         }
 
         if (text.StartsWith("PING:"))
@@ -176,17 +224,6 @@ public class NewSocketsUDPServer : MonoBehaviour
 
     void ServerThread()
     {
-        try
-        {
-            m_socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-            m_socket.Bind(new IPEndPoint(IPAddress.Any, port));
-        }
-        catch (SocketException e)
-        {
-            Log("[SERVER] Could not start: " + e.SocketErrorCode);
-            m_running = false; return;
-        }
-
         Log("[SERVER] Listening UDP on " + port);
 
         byte[] buffer = new byte[MaxPacketSize];
@@ -230,6 +267,7 @@ public class NewSocketsUDPServer : MonoBehaviour
 
     void OnGUI()
     {
+        if (!showDebugUI) return;
         GUILayout.BeginArea(new Rect(10, 10, Screen.width - 20, Screen.height - 20));
         GUILayout.Label("UDP MINIGAME SERVER - Port: " + port);
         GUILayout.Label("Connected Players: " + m_knownClients.Count);
@@ -241,5 +279,46 @@ public class NewSocketsUDPServer : MonoBehaviour
                 GUILayout.Label(m_log[i]);
         }
         GUILayout.EndArea();
+    }
+
+    // =============================================================================================
+    // List
+    // =============================================================================================
+    void SendPlayerList()
+    {
+        string message = "PLAYERS:";
+
+        for (int i = 0; i < m_players.Count; i++)
+        {
+            if (i > 0)
+                message += ",";
+
+            message += m_players[i].name;
+        }
+
+        Broadcast(message);
+    }
+
+    // =============================================================================================
+    // Remove Players
+    // =============================================================================================
+    void RemovePlayer(EndPoint endpoint)
+    {
+        lock (m_lastSeen) m_lastSeen.Remove(endpoint);
+
+        lock (m_knownClients) m_knownClients.Remove(endpoint);
+
+        for (int i = 0; i < m_players.Count; i++)
+        {
+            if (m_players[i].endpoint.Equals(endpoint))
+            {
+                Log("[SERVER] Player left: " + m_players[i].name);
+                m_players.RemoveAt(i);
+                break;
+            }
+        }
+
+        Broadcast("DISC:" + endpoint.ToString());
+        SendPlayerList();
     }
 }

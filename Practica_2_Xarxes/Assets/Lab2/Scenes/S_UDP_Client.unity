@@ -165,6 +165,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NewSocketsUDPClient
   serverIp: 127.0.0.1
   port: 9050
+  userName: Marc
   autoStart: 0
 --- !u!1 &409422190
 GameObject:

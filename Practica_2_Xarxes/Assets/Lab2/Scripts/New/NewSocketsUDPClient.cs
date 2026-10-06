@@ -13,7 +13,11 @@ public class NewSocketsUDPClient : MonoBehaviour
 {
     public string serverIp = "127.0.0.1";
     public int port = 9050;
+    public string userName = "Player";
     public bool autoStart = true;
+    public bool showDebugUI = true;
+
+    private List<string> m_players = new List<string>();
 
     const int MaxPacketSize = 64 * 1024;
 
@@ -53,6 +57,9 @@ public class NewSocketsUDPClient : MonoBehaviour
     public void Disconnect()
     {
         if (!m_running) return;
+
+        // By sending Leave here before closing the socket, we can skip the wainting timeout
+        SendString("LEAVE:");
         m_running = false;
 
         if (m_socket != null)
@@ -69,6 +76,7 @@ public class NewSocketsUDPClient : MonoBehaviour
             }
         }
         m_playerCapsules.Clear();
+        m_players.Clear();
 
         Debug.Log("[CLIENT] Stopped");
     }
@@ -106,6 +114,12 @@ public class NewSocketsUDPClient : MonoBehaviour
         // Click-to-move system
         if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
         {
+            // Prevents UI clicks from moving player capsule
+            if (UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+            {
+                return;
+            }
+
             Vector2 mousePos = Mouse.current.position.ReadValue();
             Ray ray = Camera.main.ScreenPointToRay(mousePos);
             Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
@@ -128,6 +142,27 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     void ProcessGameMessage(string message)
     {
+        // PLAYERS:name1,name2,... -> replaces the local list with the one sent by the server
+        if (message.StartsWith("PLAYERS:"))
+        {
+            string names = message.Substring(8);
+
+            m_players.Clear();
+
+            if (names.Length > 0)
+            {
+                string[] receivedNames = names.Split(',');
+
+                for (int i = 0; i < receivedNames.Length; i++)
+                {
+                    m_players.Add(receivedNames[i]);
+                }
+            }
+
+            Debug.Log("[CLIENT] Players: " + names);
+            return;
+        }
+
         // The server notifies the Timeout us that someone disconnected (Timeout)
         if (message.StartsWith("DISC:"))
         {
@@ -195,6 +230,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     {
         m_socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         m_serverEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), port);
+        SendString("JOIN:" + userName);
 
         Debug.Log("[CLIENT] UDP Ready, connecting to " + m_serverEndPoint);
 
@@ -222,6 +258,7 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     void OnGUI()
     {
+        if (!showDebugUI) return;
         GUILayout.BeginArea(new Rect(10, 10, 350, 120), GUI.skin.box);
 
         GUILayout.Label("--- MINIGAME UDP CLIENT ---");
@@ -253,5 +290,19 @@ public class NewSocketsUDPClient : MonoBehaviour
         }
 
         GUILayout.EndArea();
+    }
+
+    // =============================================================================================
+    // Getters
+    // =============================================================================================
+
+    public string GetPlayerNames()
+    {
+        return string.Join("\n", m_players);
+    }
+
+    public bool IsRunning()
+    {
+        return m_running;
     }
 }
