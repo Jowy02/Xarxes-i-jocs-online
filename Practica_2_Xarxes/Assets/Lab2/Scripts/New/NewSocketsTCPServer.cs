@@ -540,6 +540,13 @@ public class NewSocketsTCPServer : MonoBehaviour
         }
 
         GUILayout.Space(20);
+;
+        GUILayout.Label("Players (" + m_userNames.Count + "):");
+        foreach (string p in m_userNames.Values)
+            GUILayout.Label("  - " + p);
+
+        GUILayout.Space(20);
+
         GUILayout.Label("Stored messages:");
 
         lock (m_messages)
