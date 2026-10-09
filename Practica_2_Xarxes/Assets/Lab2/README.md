@@ -27,7 +27,11 @@ This project is a low-level networking implementation in Unity using **C# Socket
 * **The Host also plays**: In the Create Game scene, clicking "Host" successfully starts the Server thread in the background and automatically connects a local Client to `127.0.0.1`, allowing the host to chat, appear in the list, and play the minigame alongside everyone else.
 
 ## ⚙️ Installation
-**Pendiente**
+Download the latest release from [here](https://github.com/Jowy02/Xarxes-i-jocs-online/releases), extract the zip and run the builds.
+
+You can also open the project in Unity (6000.3.16f1) by importing the `.unitypackage` that comes with the release.
+
+To test on the same PC leave the Server IP as `127.0.0.1`. On a LAN use the host's IP.
 
 ## 🎮 Controls
 
