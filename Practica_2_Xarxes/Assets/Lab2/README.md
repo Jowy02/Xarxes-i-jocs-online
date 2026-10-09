@@ -33,6 +33,10 @@ You can also open the project in Unity (6000.3.16f1) by importing the `.unitypac
 
 To test on the same PC leave the Server IP as `127.0.0.1`. On a LAN use the host's IP.
 
+To test *UDP* , the Scene *LobbyUDP* is a combined version of the scene *S_UDP_Server* and *S_UDP_Client*, wich have the same functionalities but are separated versions of the UDP features.
+
+To test *TCP* , can be tested in the scene *S_TCP_Server* and *S_TCP_Client* , there is not combined version scene.
+
 ## 🎮 Controls
 
 * **TCP Chat**: Keyboard (Type in the InputField and press Send).
