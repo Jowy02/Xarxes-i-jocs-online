@@ -17,10 +17,10 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Lab2/Scenes/S_TCP_Server.unity
     guid: f9e63c3d3d2c7444c9b163a855bdbdc4
-  - enabled: 0
+  - enabled: 1
     path: Assets/Lab2/Scenes/S_TCP_Client.unity
     guid: 84f0f932c335b5945a7337f416154dff
-  - enabled: 1
+  - enabled: 0
     path: Assets/Lab2/Scenes/LobbyUDP.unity
     guid: 682f6f0b886dc4d43895d7f8bdc77d5f
   m_configObjects:
