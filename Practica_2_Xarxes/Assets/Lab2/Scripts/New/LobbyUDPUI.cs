@@ -60,6 +60,14 @@ public class LobbyUDPUI : MonoBehaviour
         if (!client.IsRunning())
         {
             roleText.text = "Not Connected";
+            lobbyPanel.SetActive(true);
+            toggleLobbyButton.SetActive(false);
+
+            if (isHost)
+            {
+                server.Disconnect();
+                isHost = false;
+            }
         }
         else if (isHost)
         {

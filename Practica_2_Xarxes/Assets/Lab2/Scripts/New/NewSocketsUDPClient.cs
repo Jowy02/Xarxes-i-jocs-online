@@ -32,6 +32,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     float m_pingTimer = 0f;
     readonly Dictionary<string, GameObject> m_playerCapsules = new Dictionary<string, GameObject>();
     string posMsg = "POS:{0:0},{0:0},{0:0}";
+    private float m_lastServerResponse;
 
     // =============================================================================================
     // START / STOP
@@ -47,6 +48,8 @@ public class NewSocketsUDPClient : MonoBehaviour
     {
         if (m_running) return;
         m_running = true;
+        m_lastServerResponse = Time.realtimeSinceStartup;
+        m_pingTimer = 0f;
 
         Thread t = new Thread(ClientThread);
         t.IsBackground = true;
@@ -102,6 +105,14 @@ public class NewSocketsUDPClient : MonoBehaviour
 
         if (!m_running) return;
 
+        // Stop the client after five seconds without a server response
+        if (Time.realtimeSinceStartup - m_lastServerResponse >= 5f)
+        {
+            Debug.Log("[CLIENT] Server timed out.");
+            Disconnect();
+            return;
+        }
+
         // Send PING every 1 second exact
         m_pingTimer -= Time.deltaTime;
         if (m_pingTimer <= 0)
@@ -142,6 +153,15 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     void ProcessGameMessage(string message)
     {
+
+        if (!m_running) return;
+
+        if (message == "SERVER_ACTIVE")
+        {
+            m_lastServerResponse = Time.realtimeSinceStartup;
+            return;
+        }
+
         // PLAYERS:name1,name2,... -> replaces the local list with the one sent by the server
         if (message.StartsWith("PLAYERS:"))
         {
@@ -241,7 +261,7 @@ public class NewSocketsUDPClient : MonoBehaviour
             try
             {
                 int received = m_socket.ReceiveFrom(buffer, ref from);
-                if (received > 0)
+                if (received > 0 && from.Equals(m_serverEndPoint))
                 {
                     byte[] payload = new byte[received];
                     Array.Copy(buffer, payload, received);

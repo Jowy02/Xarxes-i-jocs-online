@@ -185,9 +185,19 @@ public class NewSocketsUDPServer : MonoBehaviour
             return;
         }
 
-        if (text.StartsWith("PING:"))
+        if (text == "PING:")
         {
-            Log("[SERVER] Heartbeat (PING) received from: " + from.ToString());
+            byte[] reply = Encoding.UTF8.GetBytes("SERVER_ACTIVE");
+
+            try
+            {
+                m_socket.SendTo(reply, from);
+            }
+            catch (SocketException error)
+            {
+                Log("[SERVER] SERVER_ACTIVE failed: " + error.SocketErrorCode);
+            }
+
             return;
         }
 
