@@ -39,7 +39,7 @@ This project is a low-level networking implementation in Unity using **C# Socket
 <table>
   <tr>
         <td width="30%">
-      <img src="LINK" width="100%" alt="TCP Chat">
+      <img src="/Gifs/TCP_Chat.gif" width="100%" alt="TCP Chat">
     </td>
     <td>
       <b>1. TCP Lobby & Chat</b><br>
@@ -49,7 +49,7 @@ This project is a low-level networking implementation in Unity using **C# Socket
 
   <tr>
     <td width="30%">
-      <img src="LINK" width="100%" alt="Lobby UDP">
+      <img src="/Gifs/UDP_Lobby.gif" width="100%" alt="Lobby UDP">
     </td>
     <td>
       <b>2. UDP Host or Join a Game</b><br>
@@ -59,7 +59,7 @@ This project is a low-level networking implementation in Unity using **C# Socket
 
   <tr>
     <td width="30%">
-      <img src="LINK" width="100%" alt="UDP Minigame">
+      <img src="/Gifs/UDP_Minigame.gif" width="100%" alt="UDP Minigame">
     </td>
     <td>
       <b>3. UDP Minigame</b><br>
