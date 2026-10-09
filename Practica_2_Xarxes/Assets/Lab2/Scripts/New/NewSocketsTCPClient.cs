@@ -30,6 +30,9 @@ public class NewSocketsTCPClient : MonoBehaviour
     string m_messageInput = "";
     readonly List<string> m_players = new List<string>();
 
+    // Time left until the next heartbeat is sent to the server.
+    float m_pingTimer = 0f;
+
     public bool IsRunning
     {
         get { return m_running; }
@@ -102,6 +105,18 @@ public class NewSocketsTCPClient : MonoBehaviour
 
         while (m_inbox.TryDequeue(out data))
             OnPacketReceived(data);
+
+        // Heartbeat so the server can detect a lost connection.
+        if (m_running && m_connection != null)
+        {
+            m_pingTimer -= Time.deltaTime;
+
+            if (m_pingTimer <= 0f)
+            {
+                SendString("PING:");
+                m_pingTimer = 1f;
+            }
+        }
     }
 
     // =============================================================================================
@@ -116,9 +131,9 @@ public class NewSocketsTCPClient : MonoBehaviour
         }
         catch (SocketException e)
         {
-            Log("[CLIENT] Could not connect: " + e.SocketErrorCode + 
+            Log("[CLIENT] Could not connect: " + e.SocketErrorCode +
                 (e.SocketErrorCode == SocketError.ConnectionRefused
-                ? " (nobody is listening on " + serverIp + ":" + port + ")": "")
+                ? " (nobody is listening on " + serverIp + ":" + port + ")" : "")
             );
             m_running = false;
             return;
@@ -400,7 +415,7 @@ public class NewSocketsTCPClient : MonoBehaviour
 
     void OnGUI()
     {
-        GUILayout.BeginArea(new Rect(10,10,Screen.width - 20,Screen.height - 20));
+        GUILayout.BeginArea(new Rect(10, 10, Screen.width - 20, Screen.height - 20));
         GUILayout.Label("TCP CLIENT / WAITING ROOM");
         GUILayout.Label("Server: " + serverIp + ":" + port);
         GUILayout.Space(10);
@@ -459,8 +474,8 @@ public class NewSocketsTCPClient : MonoBehaviour
 
     Socket StartClient()
     {
-        Socket socket = new Socket(AddressFamily.InterNetwork,SocketType.Stream,ProtocolType.Tcp);
-        socket.Connect(new IPEndPoint(IPAddress.Parse(serverIp),port));
+        Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        socket.Connect(new IPEndPoint(IPAddress.Parse(serverIp), port));
         return socket;
     }
 

@@ -27,9 +27,14 @@ public class NewSocketsTCPServer : MonoBehaviour
     readonly List<Thread> m_threads = new List<Thread>();
     readonly ConcurrentQueue<Packet> m_inbox = new ConcurrentQueue<Packet>();
     readonly List<string> m_log = new List<string>();
-    readonly List<string> m_messages =  new List<string>();
+    readonly List<string> m_messages = new List<string>();
     readonly Dictionary<Socket, string> m_userNames = new Dictionary<Socket, string>();
     readonly HashSet<int> m_warned = new HashSet<int>();
+    readonly Dictionary<Socket, long> m_lastSeen = new Dictionary<Socket, long>();
+
+    // Monotonic millisecond clock 
+    static readonly System.Diagnostics.Stopwatch s_clock = System.Diagnostics.Stopwatch.StartNew();
+    static long NowMs() { return s_clock.ElapsedMilliseconds; }
 
     volatile bool m_running;
 
@@ -120,7 +125,25 @@ public class NewSocketsTCPServer : MonoBehaviour
         Packet packet;
 
         while (m_inbox.TryDequeue(out packet))
-            OnPacketReceived(packet.data,packet.from);
+            OnPacketReceived(packet.data, packet.from);
+
+        // Close clients that have been silent for more than 5 seconds.
+        List<Socket> timedOut = new List<Socket>();
+
+        lock (m_lastSeen)
+        {
+            foreach (KeyValuePair<Socket, long> entry in m_lastSeen)
+            {
+                if (NowMs() - entry.Value > 5000)
+                    timedOut.Add(entry.Key);
+            }
+        }
+
+        foreach (Socket client in timedOut)
+        {
+            Log("[SERVER] Timeout");
+            CloseSocket(client);
+        }
     }
 
     // =============================================================================================
@@ -183,7 +206,9 @@ public class NewSocketsTCPServer : MonoBehaviour
                 m_clients.Add(client);
             }
 
-            Log("[SERVER] Client connected: " +client.RemoteEndPoint);
+            lock (m_lastSeen) m_lastSeen[client] = NowMs();
+
+            Log("[SERVER] Client connected: " + client.RemoteEndPoint);
 
             Socket captured = client;
 
@@ -210,6 +235,8 @@ public class NewSocketsTCPServer : MonoBehaviour
 
         lock (m_clients)
             m_clients.Remove(client);
+
+        lock (m_lastSeen) m_lastSeen.Remove(client);
 
         Log("[SERVER] Client disconnected" +
             (string.IsNullOrEmpty(username)? "": ": " + username));
@@ -300,7 +327,9 @@ public class NewSocketsTCPServer : MonoBehaviour
 
             byte[] payload = new byte[size];
 
-            if (!ReadExactly(socket,payload,size)) return;
+            if (!ReadExactly(socket, payload, size)) return;
+
+            lock (m_lastSeen) m_lastSeen[socket] = NowMs();
 
             // Network thread -> Unity main thread.
             m_inbox.Enqueue(new Packet {data = payload,from = socket});
@@ -410,6 +439,8 @@ public class NewSocketsTCPServer : MonoBehaviour
 
             return;
         }
+
+        if (message == "PING:") return;
 
         if (message.StartsWith("LEAVE:"))
         {
@@ -551,8 +582,8 @@ public class NewSocketsTCPServer : MonoBehaviour
 
         lock (m_messages)
         {
-            for (int i = 0;i < m_messages.Count;i++)
-                GUILayout.Label(i + ": " +m_messages[i]);
+            for (int i = 0; i < m_messages.Count; i++)
+                GUILayout.Label(i + ": " + m_messages[i]);
         }
 
         GUILayout.Space(20);
@@ -573,8 +604,8 @@ public class NewSocketsTCPServer : MonoBehaviour
 
     Socket StartServer()
     {
-        Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream,ProtocolType.Tcp);
-        socket.Bind(new IPEndPoint(IPAddress.Any,port));
+        Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        socket.Bind(new IPEndPoint(IPAddress.Any, port));
         socket.Listen(10);
 
         return socket;
