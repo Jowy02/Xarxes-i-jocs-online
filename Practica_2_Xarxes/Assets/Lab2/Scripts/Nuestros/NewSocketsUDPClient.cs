@@ -19,6 +19,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     public bool showDebugUI = true;
 
     private List<string> m_players = new List<string>();
+    readonly List<string> m_chatlog = new List<string>();
 
     const int MaxPacketSize = 64 * 1024;
 
@@ -216,6 +217,16 @@ public class NewSocketsUDPClient : MonoBehaviour
             }
             return;
         }
+        if (message.StartsWith("CHAT:"))
+        {
+            lock (m_chatlog)
+            {
+                message = message.Substring(5).Trim();
+                m_chatlog.Add(message);
+                if (m_chatlog.Count > 100) m_chatlog.RemoveAt(0);
+            }
+            return;
+        }
     }
     void ProcessPlayerMessage(UDPPlayer.PlayerDTO dto)
     {
@@ -239,7 +250,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     // SEND
     // =============================================================================================
 
-    void SendString(string text)
+    public void SendString(string text)
     {
         Send(UDPPlayer.MsgType.Text, text);
     }
@@ -343,7 +354,10 @@ public class NewSocketsUDPClient : MonoBehaviour
     {
         return string.Join("\n", m_players);
     }
-
+    public string GetChatLog()
+    {
+        return string.Join("\n", m_chatlog);
+    }
     public bool IsRunning()
     {
         return m_running;

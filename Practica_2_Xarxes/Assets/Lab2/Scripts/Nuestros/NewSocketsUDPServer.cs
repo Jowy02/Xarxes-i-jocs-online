@@ -226,6 +226,12 @@ public class NewSocketsUDPServer : MonoBehaviour
             Send(UDPPlayer.MsgType.Text, "SERVER_ACTIVE", from);
             return;
         }
+
+        if (text.StartsWith("CHAT:"))
+        {
+            Broadcast(text);
+            return;
+        }
     }
 
     // =============================================================================================
@@ -306,7 +312,7 @@ public class NewSocketsUDPServer : MonoBehaviour
         {
             m_log.Add(message);
             // Keep only the last 100 messages to prevent infinite memory usage
-            if (m_log.Count > 100) m_log.RemoveAt(0);
+            if (m_log.Count > 10) m_log.RemoveAt(0);
         }
     }
 

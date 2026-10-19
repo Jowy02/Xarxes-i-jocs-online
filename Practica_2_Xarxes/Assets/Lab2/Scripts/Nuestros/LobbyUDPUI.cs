@@ -1,9 +1,14 @@
 using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
+using Unity.VisualScripting;
 
 public class LobbyUDPUI : MonoBehaviour
 {
+    // =============================================================================================
+    // PLAYER - SERVER
+    // =============================================================================================
+
     [SerializeField] private NewSocketsUDPClient client;
     [SerializeField] private NewSocketsUDPServer server;
     [SerializeField] private TMPro.TMP_Text roleText;
@@ -11,7 +16,17 @@ public class LobbyUDPUI : MonoBehaviour
     [SerializeField] private TMPro.TMP_InputField ipInput;
     [SerializeField] private TMPro.TMP_Text playersText;
     [SerializeField] private GameObject lobbyPanel;
+
+    // =============================================================================================
+    // CHAT
+    // =============================================================================================
+
     [SerializeField] private GameObject toggleLobbyButton;
+    [SerializeField] private GameObject toggleChatButton;
+    [SerializeField] private TMPro.TMP_Text chatLog;
+    [SerializeField] private TMPro.TMP_InputField chatInput;
+    [SerializeField] private GameObject chatPanel;
+
 
     private bool isHost = false;
 
@@ -19,16 +34,28 @@ public class LobbyUDPUI : MonoBehaviour
     {
         lobbyPanel.SetActive(true);
         toggleLobbyButton.SetActive(false);
+        chatPanel.SetActive(false);
+        toggleChatButton.SetActive(false);
     }
 
     public void ToggleLobby()
     {
         lobbyPanel.SetActive(!lobbyPanel.activeSelf);
     }
+    public void ToggleChat()
+    {
+        chatPanel.SetActive(!chatPanel.activeSelf);
+    }
+    public void SendChatMessage()
+    { 
+        string message = chatInput.text.Trim();
+        client.SendString("CHAT:" + client.userName + ": " + message);
+    }
     public void JoinGame()
     {
         if (client.IsRunning())
             return;
+        toggleChatButton.SetActive(true);
 
         string playerName = nameInput.text.Trim();
         string ip = ipInput.text.Trim();
@@ -79,11 +106,13 @@ public class LobbyUDPUI : MonoBehaviour
         }
 
         playersText.text = "Players:\n" + client.GetPlayerNames();
+        chatLog.text = "Chat:\n" + client.GetChatLog();
     }
 
     public void HostGame()
     {
         if (client.IsRunning()) return;
+        toggleChatButton.SetActive(true);
 
         string playerName = nameInput.text.Trim();
 
@@ -108,6 +137,9 @@ public class LobbyUDPUI : MonoBehaviour
 
     public void LeaveGame()
     {
+        toggleChatButton.SetActive(false);
+        chatPanel.SetActive(false);
+
         isHost = false;
         client.Disconnect();
         server.Disconnect();
