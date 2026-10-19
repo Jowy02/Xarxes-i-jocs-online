@@ -8,6 +8,7 @@ using System.Threading;
 using System.Globalization;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using static UDPPlayer;
 
 public class NewSocketsUDPClient : MonoBehaviour
 {
@@ -31,9 +32,8 @@ public class NewSocketsUDPClient : MonoBehaviour
     // Minigame variables
     float m_pingTimer = 0f;
     readonly Dictionary<string, GameObject> m_playerCapsules = new Dictionary<string, GameObject>();
-    string posMsg = "POS:{0:0},{0:0},{0:0}";
     private float m_lastServerResponse;
-
+    UDPPlayer.PlayerDTO m_playerDTO;
     // =============================================================================================
     // START / STOP
     // =============================================================================================
@@ -99,8 +99,31 @@ public class NewSocketsUDPClient : MonoBehaviour
         byte[] data;
         while (m_inbox.TryDequeue(out data))
         {
-            string msg = Encoding.UTF8.GetString(data);
-            ProcessGameMessage(msg);
+            UDPPlayer.MsgType type = (UDPPlayer.MsgType)data[0];
+            string content = Encoding.UTF8.GetString(data, 1, data.Length - 1);
+
+            switch (type)
+            {
+                case UDPPlayer.MsgType.Text:
+                    ProcessGameMessage(content);
+                break;
+
+                case UDPPlayer.MsgType.Player:
+                    try
+                    {
+                        UDPPlayer.PlayerDTO dto = JsonUtility.FromJson<UDPPlayer.PlayerDTO>(content);
+                        ProcessPlayerMessage(dto);
+                    }
+                    catch (ArgumentException e)
+                    {
+                        Debug.Log("[Player] Invalid JSON: " + e.Message);
+                    }
+                break;
+
+                default:
+                    Debug.Log("[SERVER] Uknown message type: " + data[0]);
+                break;
+            }
         }
 
         if (!m_running) return;
@@ -118,7 +141,8 @@ public class NewSocketsUDPClient : MonoBehaviour
         if (m_pingTimer <= 0)
         {
             SendString("PING:");
-            SendString(posMsg);
+            m_playerDTO.msgType = "POS:";
+            SendJson(m_playerDTO);
             m_pingTimer = 1f;
         }
 
@@ -138,11 +162,9 @@ public class NewSocketsUDPClient : MonoBehaviour
 
             if (groundPlane.Raycast(ray, out rayDistance))
             {
-                Vector3 point = ray.GetPoint(rayDistance);
-
-                // Format using InvariantCulture to force DOT as decimal separator
-                posMsg = string.Format(CultureInfo.InvariantCulture, "POS:{0:F2},{1:F2},{2:F2}", point.x, point.y, point.z);
-                //SendString(posMsg);
+                m_playerDTO.pos = ray.GetPoint(rayDistance);
+                m_playerDTO.msgType = "POS:";
+                SendJson(m_playerDTO);
             }
         }
     }
@@ -194,47 +216,46 @@ public class NewSocketsUDPClient : MonoBehaviour
             }
             return;
         }
-
-        if (message.StartsWith("POS:"))
+    }
+    void ProcessPlayerMessage(UDPPlayer.PlayerDTO dto)
+    {
+        if (dto.msgType == "POS:")
         {
-            string[] parts = message.Split(':');
-            // [0]="POS", [1]="127.0.0.1", [2]="54321", [3]="10.5,0,4.2"
-            if (parts.Length < 4) return;
-
-            string id = parts[1] + ":" + parts[2]; // IP and Port as unique ID
-            string coords = parts[3]; // Real coordinates
-
-            string[] axis = coords.Split(',');
-            if (axis.Length < 3) return;
-
-            // Parse coordinates
-            float x = float.Parse(axis[0], CultureInfo.InvariantCulture);
-            float y = float.Parse(axis[1], CultureInfo.InvariantCulture);
-            float z = float.Parse(axis[2], CultureInfo.InvariantCulture);
-            Vector3 targetPos = new Vector3(x, y, z);
+            string id = dto.id;
 
             // Create a capsule if this is a new player
-            if (!m_playerCapsules.ContainsKey(id))
+            if (!m_playerCapsules.ContainsKey(dto.id))
             {
                 GameObject newCapsule = GameObject.CreatePrimitive(PrimitiveType.Capsule);
                 newCapsule.GetComponent<Renderer>().material.color = Color.red;
-                m_playerCapsules[id] = newCapsule;
+                m_playerCapsules[dto.id] = newCapsule;
             }
 
             // Move the capsule to the target position
-            m_playerCapsules[id].transform.position = targetPos;
+            m_playerCapsules[dto.id].transform.position = dto.pos;
         }
     }
-
     // =============================================================================================
     // SEND
     // =============================================================================================
 
     void SendString(string text)
     {
+        Send(UDPPlayer.MsgType.Text, text);
+    }
+    void SendJson(UDPPlayer.PlayerDTO dto)
+    {
+        Send(UDPPlayer.MsgType.Player, JsonUtility.ToJson(dto));
+    }
+    void Send(UDPPlayer.MsgType type, string text)
+    {
         if (m_socket == null || m_serverEndPoint == null) return;
 
-        byte[] payload = Encoding.UTF8.GetBytes(text);
+        byte[] body = Encoding.UTF8.GetBytes(text);
+        byte[] payload = new byte[body.Length + 1];
+        payload[0] = (byte)type;
+        Buffer.BlockCopy(body, 0, payload, 1, body.Length);
+
         try
         {
             m_socket.SendTo(payload, m_serverEndPoint);
@@ -251,6 +272,8 @@ public class NewSocketsUDPClient : MonoBehaviour
         m_socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         m_serverEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), port);
         SendString("JOIN:" + userName);
+        m_playerDTO.playerName = userName;
+        m_playerDTO.pos = Vector3.zero;
 
         Debug.Log("[CLIENT] UDP Ready, connecting to " + m_serverEndPoint);
 

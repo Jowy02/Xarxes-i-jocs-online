@@ -137,8 +137,44 @@ public class NewSocketsUDPServer : MonoBehaviour
 
     void ProcessMessage(byte[] data, EndPoint from)
     {
-        string text = Encoding.UTF8.GetString(data);
+        UDPPlayer.MsgType type = (UDPPlayer.MsgType)data[0];
+        string content = Encoding.UTF8.GetString(data, 1, data.Length - 1);
 
+        switch (type)
+        {
+            case UDPPlayer.MsgType.Text:
+                HandleText(content, from);
+            break;
+
+            case UDPPlayer.MsgType.Player:
+                try
+                {
+                    UDPPlayer.PlayerDTO dto = JsonUtility.FromJson<UDPPlayer.PlayerDTO>(content);
+                    HandlePlayer(dto, from);
+                }
+                catch (ArgumentException e)
+                {
+                    Log("[SERVER] Invalid JSON: " + e.Message);
+                }
+            break;
+
+            default:
+                Log("[SERVER] Uknown message type: " + data[0]);
+            break;
+        }
+    }
+    void HandlePlayer(UDPPlayer.PlayerDTO playerDTO, EndPoint from)
+    {
+        if (playerDTO.msgType == "POS:")
+        {
+            Log("[SERVER] Movement from " + from.ToString() + " to coordinates: " + playerDTO.pos.ToString());
+            playerDTO.id = from.ToString();
+            BroadcastJson(playerDTO);
+        }
+    }
+        
+    void HandleText(string text, EndPoint from)
+    { 
         if (text == "LEAVE:")
         {
             RemovePlayer(from);
@@ -187,28 +223,8 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         if (text == "PING:")
         {
-            byte[] reply = Encoding.UTF8.GetBytes("SERVER_ACTIVE");
-
-            try
-            {
-                m_socket.SendTo(reply, from);
-            }
-            catch (SocketException error)
-            {
-                Log("[SERVER] SERVER_ACTIVE failed: " + error.SocketErrorCode);
-            }
-
+            Send(UDPPlayer.MsgType.Text, "SERVER_ACTIVE", from);
             return;
-        }
-
-        if (text.StartsWith("POS:"))
-        {
-            string coords = text.Substring(4);
-            Log("[SERVER] Movement from " + from.ToString() + " to coordinates: " + coords);
-
-            string broadcastMsg = "POS:" + from.ToString() + ":" + coords;
-
-            Broadcast(broadcastMsg);
         }
     }
 
@@ -218,16 +234,39 @@ public class NewSocketsUDPServer : MonoBehaviour
 
     void Broadcast(string message)
     {
-        byte[] data = Encoding.UTF8.GetBytes(message);
         lock (m_knownClients)
         {
             foreach (EndPoint client in m_knownClients)
             {
-                if (m_socket != null) m_socket.SendTo(data, client);
+                if (m_socket != null) Send(UDPPlayer.MsgType.Text, message, client);
             }
         }
     }
+    void BroadcastJson(UDPPlayer.PlayerDTO playerDTO)
+    {
+        lock (m_knownClients)
+        {
+            foreach (EndPoint client in m_knownClients)
+            {
+                if (m_socket != null) Send(UDPPlayer.MsgType.Player, JsonUtility.ToJson(playerDTO), client);
+            }
+        }
+    }
+    void Send(UDPPlayer.MsgType type, string text, EndPoint client)
+    {
+        if (m_socket == null ) return;
 
+        byte[] body = Encoding.UTF8.GetBytes(text);
+        byte[] payload = new byte[body.Length + 1];
+        payload[0] = (byte)type;
+        Buffer.BlockCopy(body, 0, payload, 1, body.Length);
+
+        try
+        {
+            m_socket.SendTo(payload, client);
+        }
+        catch { }
+    }
     // =============================================================================================
     // SERVER NETWORK THREAD
     // =============================================================================================
