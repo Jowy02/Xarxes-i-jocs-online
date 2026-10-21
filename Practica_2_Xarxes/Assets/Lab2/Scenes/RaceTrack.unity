@@ -2696,6 +2696,7 @@ GameObject:
   - component: {fileID: 382436296}
   - component: {fileID: 382436295}
   - component: {fileID: 382436298}
+  - component: {fileID: 382436299}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -2770,12 +2771,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 382436294}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.015392941, y: -0, z: -0, w: 0.99988157}
-  m_LocalPosition: {x: 0, y: 2.3000221, z: -7.5926876}
+  m_LocalRotation: {x: 0.01101477, y: -0.6984555, z: 0.010752559, w: 0.715488}
+  m_LocalPosition: {x: 4.820485, y: 2.3, z: -28.602898}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1216054977}
+  m_Father: {fileID: 1103283559}
   m_LocalEulerAnglesHint: {x: 1.764, y: 0, z: 0}
 --- !u!114 &382436298
 MonoBehaviour:
@@ -2821,6 +2822,27 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &382436299
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 382436294}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f6d3ff905719c845a4a6404bc4d4162, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CarChaseCamera
+  target: {fileID: 1216054977}
+  targetRb: {fileID: 1216054976}
+  offset: {x: 0, y: 2, z: -5.5}
+  extraDistanceAtMaxSpeed: 1.5
+  positionSmoothTime: 0.08
+  minFov: 60
+  maxFov: 85
+  fovSmooth: 3
+  maxSpeed: 60
 --- !u!1 &390314563
 GameObject:
   m_ObjectHideFlags: 0
@@ -4552,10 +4574,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects:
-    - targetCorrespondingSourceObject: {fileID: 261786959625234688, guid: 79d0ca8b77e301442afdb49f102e8aed, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 382436297}
+    m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 79d0ca8b77e301442afdb49f102e8aed, type: 3}
 --- !u!1 &605967457
@@ -7604,6 +7623,7 @@ Transform:
   - {fileID: 1544444234}
   - {fileID: 1371630080}
   - {fileID: 1141082000}
+  - {fileID: 382436297}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1116795611
@@ -8281,6 +8301,11 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1208243333}
   m_Mesh: {fileID: -2097598091677079461, guid: 7190964c445f2324f9f142d693d3a05c, type: 3}
+--- !u!54 &1216054976 stripped
+Rigidbody:
+  m_CorrespondingSourceObject: {fileID: 5135156708204615449, guid: 79d0ca8b77e301442afdb49f102e8aed, type: 3}
+  m_PrefabInstance: {fileID: 594102292}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &1216054977 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 261786959625234688, guid: 79d0ca8b77e301442afdb49f102e8aed, type: 3}
