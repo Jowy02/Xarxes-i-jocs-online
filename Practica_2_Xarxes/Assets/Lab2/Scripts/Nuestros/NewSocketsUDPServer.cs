@@ -92,6 +92,11 @@ public class NewSocketsUDPServer : MonoBehaviour
         Disconnect();
     }
 
+    void Awake()
+    {
+        DontDestroyOnLoad(this.gameObject);
+    }
+
     // =============================================================================================
     // UNITY UPDATE
     // =============================================================================================
