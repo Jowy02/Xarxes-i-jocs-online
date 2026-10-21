@@ -23,6 +23,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Lab2/Scenes/LobbyUDP.unity
     guid: 682f6f0b886dc4d43895d7f8bdc77d5f
+  - enabled: 1
+    path: Assets/Lab2/Scenes/RaceTrack.unity
+    guid: 0f4cfe43cb2b11444a93c0a40a78d3a5
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

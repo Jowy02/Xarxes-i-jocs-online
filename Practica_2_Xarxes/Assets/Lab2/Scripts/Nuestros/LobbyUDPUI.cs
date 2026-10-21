@@ -16,6 +16,7 @@ public class LobbyUDPUI : MonoBehaviour
     [SerializeField] private TMPro.TMP_InputField ipInput;
     [SerializeField] private TMPro.TMP_Text playersText;
     [SerializeField] private GameObject lobbyPanel;
+    [SerializeField] private GameObject startRaceButton;
 
     // =============================================================================================
     // CHAT
@@ -107,6 +108,15 @@ public class LobbyUDPUI : MonoBehaviour
 
         playersText.text = "Players:\n" + client.GetPlayerNames();
         chatLog.text = "Chat:\n" + client.GetChatLog();
+
+        if (isHost && client.IsRunning())
+        {
+            startRaceButton.SetActive(true);
+        }
+        else
+        {
+            startRaceButton.SetActive(false);
+        }
     }
 
     public void HostGame()
@@ -145,5 +155,10 @@ public class LobbyUDPUI : MonoBehaviour
         server.Disconnect();
         lobbyPanel.SetActive(true);
         toggleLobbyButton.SetActive(false);
+    }
+
+    public void OnClickStartRace()
+    {
+        client.SendString("START_RACE:");
     }
 }

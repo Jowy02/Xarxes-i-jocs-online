@@ -232,6 +232,13 @@ public class NewSocketsUDPServer : MonoBehaviour
             Broadcast(text);
             return;
         }
+
+        if (text.StartsWith("START_RACE:"))
+        {
+            Log("[SERVER] Starting Race for all players!");
+            Broadcast("START_RACE:");
+            return;
+        }
     }
 
     // =============================================================================================

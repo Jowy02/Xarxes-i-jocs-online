@@ -227,6 +227,13 @@ public class NewSocketsUDPClient : MonoBehaviour
             }
             return;
         }
+
+        if (message.StartsWith("START_RACE:"))
+        {
+            Debug.Log("[CLIENT] Loading Circuit Scene...");
+            UnityEngine.SceneManagement.SceneManager.LoadScene("RaceTrack");
+            return;
+        }
     }
     void ProcessPlayerMessage(UDPPlayer.PlayerDTO dto)
     {
