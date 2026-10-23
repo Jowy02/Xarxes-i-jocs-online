@@ -142,25 +142,21 @@ public class NewSocketsUDPServer : MonoBehaviour
 
     void ProcessMessage(byte[] data, EndPoint from)
     {
+        if (data == null || data.Length == 0) return;
+
         UDPPlayer.MsgType type = (UDPPlayer.MsgType)data[0];
-        string content = Encoding.UTF8.GetString(data, 1, data.Length - 1);
 
         switch (type)
         {
             case UDPPlayer.MsgType.Text:
+                string content = Encoding.UTF8.GetString(data, 1, data.Length - 1);
                 HandleText(content, from);
             break;
 
-            case UDPPlayer.MsgType.Player:
-                try
-                {
-                    UDPPlayer.PlayerDTO dto = JsonUtility.FromJson<UDPPlayer.PlayerDTO>(content);
-                    HandlePlayer(dto, from);
-                }
-                catch (ArgumentException e)
-                {
-                    Log("[SERVER] Invalid JSON: " + e.Message);
-                }
+            case UDPPlayer.MsgType.Transform:
+                // Binary gameplay packet (22 bytes): update keep-alive and broadcast raw payload
+                lock (m_lastSeen) m_lastSeen[from] = Time.time;
+                BroadcastRaw(data, from);
             break;
 
             default:
@@ -168,16 +164,6 @@ public class NewSocketsUDPServer : MonoBehaviour
             break;
         }
     }
-    void HandlePlayer(UDPPlayer.PlayerDTO playerDTO, EndPoint from)
-    {
-        if (playerDTO.msgType == "POS:")
-        {
-            Log("[SERVER] Movement from " + from.ToString() + " to coordinates: " + playerDTO.pos.ToString());
-            playerDTO.id = from.ToString();
-            BroadcastJson(playerDTO);
-        }
-    }
-        
     void HandleText(string text, EndPoint from)
     { 
         if (text == "LEAVE:")
@@ -216,10 +202,11 @@ public class NewSocketsUDPServer : MonoBehaviour
                 if (m_players[i].endpoint.Equals(from)) return;
             }
 
-            UDPPlayer player = new UDPPlayer(playerName, from);
+            int assignedId = m_players.Count;
+            UDPPlayer player = new UDPPlayer(playerName, from, assignedId);
             m_players.Add(player);
 
-            Log("[SERVER] Player registered: " + player.name);
+            Log("[SERVER] Player registered: " + player.name + " with ID: " + assignedId);
             Log("[SERVER] Total players: " + m_players.Count);
             SendPlayerList();
 
@@ -260,13 +247,17 @@ public class NewSocketsUDPServer : MonoBehaviour
             }
         }
     }
-    void BroadcastJson(UDPPlayer.PlayerDTO playerDTO)
+
+    void BroadcastRaw(byte[] rawData, EndPoint sender)
     {
         lock (m_knownClients)
         {
             foreach (EndPoint client in m_knownClients)
             {
-                if (m_socket != null) Send(UDPPlayer.MsgType.Player, JsonUtility.ToJson(playerDTO), client);
+                if (m_socket != null && !client.Equals(sender))
+                {
+                    try { m_socket.SendTo(rawData, client); } catch { }
+                }
             }
         }
     }
@@ -323,7 +314,7 @@ public class NewSocketsUDPServer : MonoBehaviour
         lock (m_log)
         {
             m_log.Add(message);
-            // Keep only the last 100 messages to prevent infinite memory usage
+            // Keep only the last 10 messages to prevent infinite memory usage
             if (m_log.Count > 10) m_log.RemoveAt(0);
         }
     }

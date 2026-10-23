@@ -5,10 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Globalization;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using static UDPPlayer;
 
 public class NewSocketsUDPClient : MonoBehaviour
 {
@@ -17,6 +14,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     public string userName = "Player";
     public bool autoStart = true;
     public bool showDebugUI = true;
+    public bool isHost = false;
 
     private List<string> m_players = new List<string>();
     readonly List<string> m_chatlog = new List<string>();
@@ -30,14 +28,19 @@ public class NewSocketsUDPClient : MonoBehaviour
     readonly ConcurrentQueue<byte[]> m_inbox = new ConcurrentQueue<byte[]>();
     volatile bool m_running;
 
-    // Minigame variables
     float m_pingTimer = 0f;
-    readonly Dictionary<string, GameObject> m_playerCapsules = new Dictionary<string, GameObject>();
     private float m_lastServerResponse;
-    UDPPlayer.PlayerDTO m_playerDTO;
+
+    public static event Action<UDPPlayer.CarNetworkState> OnCarTransformReceived;
+
     // =============================================================================================
     // START / STOP
     // =============================================================================================
+
+    void Awake()
+    {
+        DontDestroyOnLoad(this.gameObject);
+    }
 
     void Start()
     {
@@ -72,14 +75,6 @@ public class NewSocketsUDPClient : MonoBehaviour
             m_socket = null;
         }
 
-        foreach (GameObject capsule in m_playerCapsules.Values)
-        {
-            if (capsule != null)
-            {
-                Destroy(capsule);
-            }
-        }
-        m_playerCapsules.Clear();
         m_players.Clear();
 
         Debug.Log("[CLIENT] Stopped");
@@ -88,11 +83,6 @@ public class NewSocketsUDPClient : MonoBehaviour
     void OnDestroy()
     {
         Disconnect();
-    }
-
-    void Awake()
-    {
-        DontDestroyOnLoad(this.gameObject);
     }
 
     // =============================================================================================
@@ -105,25 +95,20 @@ public class NewSocketsUDPClient : MonoBehaviour
         byte[] data;
         while (m_inbox.TryDequeue(out data))
         {
+            if (data == null || data.Length == 0) continue;
+
             UDPPlayer.MsgType type = (UDPPlayer.MsgType)data[0];
-            string content = Encoding.UTF8.GetString(data, 1, data.Length - 1);
 
             switch (type)
             {
                 case UDPPlayer.MsgType.Text:
+                    string content = Encoding.UTF8.GetString(data, 1, data.Length - 1);
                     ProcessGameMessage(content);
                 break;
 
-                case UDPPlayer.MsgType.Player:
-                    try
-                    {
-                        UDPPlayer.PlayerDTO dto = JsonUtility.FromJson<UDPPlayer.PlayerDTO>(content);
-                        ProcessPlayerMessage(dto);
-                    }
-                    catch (ArgumentException e)
-                    {
-                        Debug.Log("[Player] Invalid JSON: " + e.Message);
-                    }
+                case UDPPlayer.MsgType.Transform:
+                    UDPPlayer.CarNetworkState state = NetworkSerializer.DeserializeCar(data);
+                    OnCarTransformReceived?.Invoke(state);
                 break;
 
                 default:
@@ -147,31 +132,7 @@ public class NewSocketsUDPClient : MonoBehaviour
         if (m_pingTimer <= 0)
         {
             SendString("PING:");
-            m_playerDTO.msgType = "POS:";
-            SendJson(m_playerDTO);
             m_pingTimer = 1f;
-        }
-
-        // Click-to-move system
-        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
-        {
-            // Prevents UI clicks from moving player capsule
-            if (UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
-            {
-                return;
-            }
-
-            Vector2 mousePos = Mouse.current.position.ReadValue();
-            Ray ray = Camera.main.ScreenPointToRay(mousePos);
-            Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
-            float rayDistance;
-
-            if (groundPlane.Raycast(ray, out rayDistance))
-            {
-                m_playerDTO.pos = ray.GetPoint(rayDistance);
-                m_playerDTO.msgType = "POS:";
-                SendJson(m_playerDTO);
-            }
         }
     }
 
@@ -181,7 +142,6 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     void ProcessGameMessage(string message)
     {
-
         if (!m_running) return;
 
         if (message == "SERVER_ACTIVE")
@@ -211,17 +171,6 @@ public class NewSocketsUDPClient : MonoBehaviour
             return;
         }
 
-        // The server notifies the Timeout us that someone disconnected (Timeout)
-        if (message.StartsWith("DISC:"))
-        {
-            string id = message.Substring(5);
-            if (m_playerCapsules.ContainsKey(id))
-            {
-                Destroy(m_playerCapsules[id]);
-                m_playerCapsules.Remove(id);
-            }
-            return;
-        }
         if (message.StartsWith("CHAT:"))
         {
             lock (m_chatlog)
@@ -240,24 +189,7 @@ public class NewSocketsUDPClient : MonoBehaviour
             return;
         }
     }
-    void ProcessPlayerMessage(UDPPlayer.PlayerDTO dto)
-    {
-        if (dto.msgType == "POS:")
-        {
-            string id = dto.id;
 
-            // Create a capsule if this is a new player
-            if (!m_playerCapsules.ContainsKey(dto.id))
-            {
-                GameObject newCapsule = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-                newCapsule.GetComponent<Renderer>().material.color = Color.red;
-                m_playerCapsules[dto.id] = newCapsule;
-            }
-
-            // Move the capsule to the target position
-            m_playerCapsules[dto.id].transform.position = dto.pos;
-        }
-    }
     // =============================================================================================
     // SEND
     // =============================================================================================
@@ -266,10 +198,20 @@ public class NewSocketsUDPClient : MonoBehaviour
     {
         Send(UDPPlayer.MsgType.Text, text);
     }
-    void SendJson(UDPPlayer.PlayerDTO dto)
+
+    public void SendCarTransform(int id, Vector3 pos, Vector3 rot, bool isDrifting)
     {
-        Send(UDPPlayer.MsgType.Player, JsonUtility.ToJson(dto));
+        if (m_socket == null || m_serverEndPoint == null || !m_running) return;
+
+        byte[] payload = NetworkSerializer.SerializeCar(id, pos, rot, isDrifting);
+
+        try
+        {
+            m_socket.SendTo(payload, m_serverEndPoint);
+        }
+        catch { }
     }
+
     void Send(UDPPlayer.MsgType type, string text)
     {
         if (m_socket == null || m_serverEndPoint == null) return;
@@ -295,8 +237,6 @@ public class NewSocketsUDPClient : MonoBehaviour
         m_socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         m_serverEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), port);
         SendString("JOIN:" + userName);
-        m_playerDTO.playerName = userName;
-        m_playerDTO.pos = Vector3.zero;
 
         Debug.Log("[CLIENT] UDP Ready, connecting to " + m_serverEndPoint);
 
@@ -343,17 +283,6 @@ public class NewSocketsUDPClient : MonoBehaviour
             if (GUILayout.Button("Disconnect", GUILayout.Width(100))) Disconnect();
         }
         GUILayout.EndHorizontal();
-
-        GUILayout.Space(10);
-
-        if (m_running)
-        {
-            GUILayout.Label("Click anywhere to move!");
-        }
-        else
-        {
-            GUILayout.Label("Waiting to connect...");
-        }
 
         GUILayout.EndArea();
     }

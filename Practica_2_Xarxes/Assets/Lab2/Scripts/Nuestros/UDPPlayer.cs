@@ -7,11 +7,21 @@ public class UDPPlayer
 {
     public string name;
     public EndPoint endpoint;
+    public int id;
 
-    public UDPPlayer(string name, EndPoint endpoint)
+    public UDPPlayer(string name, EndPoint endpoint, int id = 0)
     {
         this.name = name;
         this.endpoint = endpoint;
+        this.id = id;
+    }
+    // Binary network state for vehicle synchronization (30 bytes total)
+    public struct CarNetworkState
+    {
+        public int objectId;
+        public Vector3 position;
+        public Vector3 rotation;
+        public bool isDrifting;
     }
 
     [Serializable]
@@ -25,6 +35,6 @@ public class UDPPlayer
     public enum MsgType : byte
     {
         Text = 1,
-        Player = 2, 
+        Transform = 2
     }
 }
