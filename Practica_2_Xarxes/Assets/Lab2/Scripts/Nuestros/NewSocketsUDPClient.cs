@@ -16,8 +16,11 @@ public class NewSocketsUDPClient : MonoBehaviour
     public bool showDebugUI = true;
     public bool isHost = false;
 
+    private int m_localPlayerId = -1;
+
     private List<string> m_players = new List<string>();
     readonly List<string> m_chatlog = new List<string>();
+    private List<int> m_racePlayerIds = new List<int>();
 
     const int MaxPacketSize = 64 * 1024;
 
@@ -51,9 +54,11 @@ public class NewSocketsUDPClient : MonoBehaviour
     public void StartNetwork()
     {
         if (m_running) return;
+        m_localPlayerId = -1;
         m_running = true;
         m_lastServerResponse = Time.realtimeSinceStartup;
         m_pingTimer = 0f;
+        m_racePlayerIds.Clear();
 
         Thread t = new Thread(ClientThread);
         t.IsBackground = true;
@@ -144,6 +149,19 @@ public class NewSocketsUDPClient : MonoBehaviour
     {
         if (!m_running) return;
 
+        if (message.StartsWith("YOUR_ID:"))
+        {
+            int receivedId;
+
+            if (int.TryParse(message.Substring(8), out receivedId))
+            {
+                m_localPlayerId = receivedId;
+                Debug.Log("[CLIENT] My player ID: " + m_localPlayerId);
+            }
+
+            return;
+        }
+
         if (message == "SERVER_ACTIVE")
         {
             m_lastServerResponse = Time.realtimeSinceStartup;
@@ -184,7 +202,30 @@ public class NewSocketsUDPClient : MonoBehaviour
 
         if (message.StartsWith("START_RACE:"))
         {
-            Debug.Log("[CLIENT] Loading Circuit Scene...");
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "RaceTrack")
+            {
+                return;
+            }
+
+            string idsText = message.Substring(11);
+            string[] receivedIds = idsText.Split(',');
+
+            m_racePlayerIds.Clear();
+
+            for (int i = 0; i < receivedIds.Length; i++)
+            {
+                int playerId;
+
+                if (!int.TryParse(receivedIds[i], out playerId))
+                {
+                    m_racePlayerIds.Clear();
+                    Debug.LogError("[CLIENT] Invalid race player list");
+                    return;
+                }
+
+                m_racePlayerIds.Add(playerId);
+            }
+
             UnityEngine.SceneManagement.SceneManager.LoadScene("RaceTrack");
             return;
         }
@@ -302,5 +343,13 @@ public class NewSocketsUDPClient : MonoBehaviour
     public bool IsRunning()
     {
         return m_running;
+    }
+    public int GetLocalPlayerId()
+    {
+        return m_localPlayerId;
+    }
+    public int[] GetRacePlayerIds()
+    {
+        return m_racePlayerIds.ToArray();
     }
 }

@@ -14,6 +14,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     public bool showDebugUI = true;
 
     private List<UDPPlayer> m_players = new List<UDPPlayer>();
+    private int m_nextPlayerId = 0;
 
     const int MaxPacketSize = 64 * 1024;
 
@@ -202,10 +203,12 @@ public class NewSocketsUDPServer : MonoBehaviour
                 if (m_players[i].endpoint.Equals(from)) return;
             }
 
-            int assignedId = m_players.Count;
+            int assignedId = m_nextPlayerId;
+            m_nextPlayerId++;
             UDPPlayer player = new UDPPlayer(playerName, from, assignedId);
             m_players.Add(player);
 
+            Send(UDPPlayer.MsgType.Text, "YOUR_ID:" + assignedId, from);
             Log("[SERVER] Player registered: " + player.name + " with ID: " + assignedId);
             Log("[SERVER] Total players: " + m_players.Count);
             SendPlayerList();
@@ -227,8 +230,19 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         if (text.StartsWith("START_RACE:"))
         {
-            Log("[SERVER] Starting Race for all players!");
-            Broadcast("START_RACE:");
+            string startMessage = "START_RACE:";
+
+            for (int i = 0; i < m_players.Count; i++)
+            {
+                if (i > 0)
+                {
+                    startMessage += ",";
+                }
+
+                startMessage += m_players[i].id;
+            }
+
+            Broadcast(startMessage);
             return;
         }
     }
