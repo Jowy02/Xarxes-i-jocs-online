@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
 
 public class RaceSpawner : MonoBehaviour
@@ -9,8 +10,11 @@ public class RaceSpawner : MonoBehaviour
     [SerializeField] private Transform[] spawnPoints;
 
     // Client and local player info
+    [SerializeField] private TMPro.TMP_Text countdownText;
+    [SerializeField] private GameObject hostRestartButton;
+
     private NewSocketsUDPClient client;
-    private int localPlayerId;
+    private int localPlayerId = -1;
 
     private GameObject localCar;
     private PrometeoCarController localController;
@@ -18,9 +22,13 @@ public class RaceSpawner : MonoBehaviour
     // Cars
     private Dictionary<int, GameObject> cars = new Dictionary<int, GameObject>();
 
-    private float sendTimer = 0f;
+    // Target transforms for jitter removal
+    private Dictionary<int, Vector3> targetPositions = new Dictionary<int, Vector3>();
+    private Dictionary<int, Quaternion> targetRotations = new Dictionary<int, Quaternion>();
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    private float sendTimer = 0f;
+    private bool raceStarted = false;
+
     void Start()
     {
         TestSerializer();
@@ -33,19 +41,16 @@ public class RaceSpawner : MonoBehaviour
             return;
         }
 
+        // Show host restart button only for the host
+        if (hostRestartButton != null)
+        {
+            hostRestartButton.SetActive(client.isHost);
+        }
+
         int[] playerIds = client.GetRacePlayerIds();
         localPlayerId = client.GetLocalPlayerId();
 
         // Check if we have enough spawn points
-        for (int i = 0; i < playerIds.Length; i++)
-        {
-            if (spawnPoints[i] == null)
-            {
-                Debug.LogError("[SPAWN] A spawn point is not assigned");
-                return;
-            }
-        }
-
         if (spawnPoints == null || spawnPoints.Length < playerIds.Length)
         {
             Debug.LogError("[SPAWN] Not enough spawn points");
@@ -53,21 +58,68 @@ public class RaceSpawner : MonoBehaviour
         }
 
         SpawnCars(playerIds);
+        StartCoroutine(StartCountdownRoutine());
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-        SendLocalCarState();
-    }
     void OnEnable()
     {
         NewSocketsUDPClient.OnCarTransformReceived += UpdateRemoteCar;
+        NewSocketsUDPClient.OnRaceRestarted += HandleRaceRestart;
     }
 
     void OnDisable()
     {
         NewSocketsUDPClient.OnCarTransformReceived -= UpdateRemoteCar;
+        NewSocketsUDPClient.OnRaceRestarted -= HandleRaceRestart;
+    }
+
+    void OnDestroy()
+    {
+        // Cleanup all instantiated cars from scene
+        foreach (KeyValuePair<int, GameObject> kvp in cars)
+        {
+            if (kvp.Value != null)
+            {
+                Destroy(kvp.Value);
+            }
+        }
+
+        cars.Clear();
+        targetPositions.Clear();
+        targetRotations.Clear();
+    }
+
+    void Update()
+    {
+        if (raceStarted)
+        {
+            SendLocalCarState();
+        }
+
+        SmoothRemoteCars();
+    }
+
+    // Smooth remote cars removes 20Hz network jitter
+    void SmoothRemoteCars()
+    {
+        foreach (KeyValuePair<int, GameObject> entry in cars)
+        {
+            int carId = entry.Key;
+            if (carId == localPlayerId) continue;
+
+            GameObject remoteCar = entry.Value;
+            if (remoteCar == null) continue;
+
+            if (targetPositions.ContainsKey(carId))
+            {
+                remoteCar.transform.position = Vector3.Lerp(remoteCar.transform.position, targetPositions[carId], Time.deltaTime * 15f);
+            }
+
+            if (targetRotations.ContainsKey(carId))
+            {
+                remoteCar.transform.rotation = Quaternion.Slerp(remoteCar.transform.rotation, targetRotations[carId], Time.deltaTime * 15f);
+            }
+        }
     }
 
     // Car creation
@@ -75,16 +127,16 @@ public class RaceSpawner : MonoBehaviour
     {
         for (int i = 0; i < playerIds.Length; i++)
         {
+            int pId = playerIds[i];
             GameObject spawnedCar = Instantiate(carPrefab, spawnPoints[i].position, spawnPoints[i].rotation);
 
-            spawnedCar.name = "Car_" + playerIds[i];
-            cars.Add(playerIds[i], spawnedCar);
+            spawnedCar.name = "Car_" + pId;
+            cars.Add(pId, spawnedCar);
+            targetPositions[pId] = spawnPoints[i].position;
+            targetRotations[pId] = spawnPoints[i].rotation;
 
-            // Revise which car is the local player
-            bool isLocalPlayer = playerIds[i] == localPlayerId;
-
+            bool isLocalPlayer = (pId == localPlayerId);
             PrometeoCarController controller = spawnedCar.GetComponent<PrometeoCarController>();
-
             Rigidbody carRb = spawnedCar.GetComponent<Rigidbody>();
 
             if (controller == null || carRb == null)
@@ -96,69 +148,138 @@ public class RaceSpawner : MonoBehaviour
             // Only enable for the local player
             if (isLocalPlayer)
             {
-                controller.enabled = true;
-            }
-            else
-            {
-                controller.enabled = false;
-            }
-
-            if (isLocalPlayer)
-            {
                 localCar = spawnedCar;
                 localController = controller;
+                localController.enabled = false; // Block until countdown ends
 
                 cameraFollow.target = spawnedCar.transform;
                 cameraFollow.targetRb = carRb;
             }
             else
             {
-                // Temporal - For test
-                carRb.isKinematic = true;
+                controller.enabled = false;
+                carRb.isKinematic = true; // Allows local car to collide against remote car as a solid body
             }
         }
     }
 
-    void SendLocalCarState()
+    // 5 Seconds countdown timer
+    IEnumerator StartCountdownRoutine()
     {
-        if (client == null || !client.IsRunning())
+        raceStarted = false;
+
+        if (localController != null)
         {
-            return;
+            localController.enabled = false;
         }
 
-        if (localCar == null || localController == null)
+        int count = 5;
+
+        while (count > 0)
         {
-            return;
+            if (countdownText != null)
+            {
+                countdownText.gameObject.SetActive(true);
+                countdownText.text = count.ToString();
+            }
+
+            yield return new WaitForSeconds(1f);
+            count--;
         }
+
+        if (countdownText != null)
+        {
+            countdownText.text = "GO!";
+        }
+
+        raceStarted = true;
+
+        if (localController != null)
+        {
+            localController.enabled = true;
+        }
+
+        yield return new WaitForSeconds(1f);
+
+        if (countdownText != null)
+        {
+            countdownText.gameObject.SetActive(false);
+        }
+    }
+
+    public void OnClickHostRestart()
+    {
+        if (client == null || !client.isHost) return;
+
+        client.SendString("RESTART_RACE:");
+    }
+
+    void HandleRaceRestart()
+    {
+        StopAllCoroutines();
+
+        // Reposition all cars to starting grid
+        int[] playerIds = client.GetRacePlayerIds();
+
+        for (int i = 0; i < playerIds.Length; i++)
+        {
+            int pId = playerIds[i];
+
+            if (cars.TryGetValue(pId, out GameObject car) && car != null)
+            {
+                car.transform.position = spawnPoints[i].position;
+                car.transform.rotation = spawnPoints[i].rotation;
+                targetPositions[pId] = spawnPoints[i].position;
+                targetRotations[pId] = spawnPoints[i].rotation;
+
+                Rigidbody rb = car.GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    rb.linearVelocity = Vector3.zero;
+                    rb.angularVelocity = Vector3.zero;
+                }
+            }
+        }
+
+        StartCoroutine(StartCountdownRoutine());
+    }
+
+    void SendLocalCarState()
+    {
+        if (client == null || !client.IsRunning()) return;
+        if (localCar == null || localController == null) return;
 
         sendTimer += Time.deltaTime;
 
-        if (sendTimer >= 0.05f)
+        if (sendTimer >= 0.05f) // 20 times per second
         {
-            sendTimer = 0.00f;
-
+            sendTimer = 0.0f;
             client.SendCarTransform(localPlayerId, localCar.transform.position, localCar.transform.eulerAngles, localController.isDrifting);
         }
     }
 
     void UpdateRemoteCar(UDPPlayer.CarNetworkState state)
     {
-        if (client == null || !client.IsRunning())
-        {
-            return;
-        }
-
-        if (state.objectId == localPlayerId)
-        {
-            return;
-        }
+        if (client == null || !client.IsRunning()) return;
+        if (state.objectId == localPlayerId) return;
 
         GameObject remoteCar;
 
-        if (cars.TryGetValue(state.objectId, out remoteCar))
+        if (cars.TryGetValue(state.objectId, out remoteCar) && remoteCar != null)
         {
-            remoteCar.transform.position = state.position;
-            remoteCar.transform.rotation = Quaternion.Euler(state.rotation);
+            // Store targets for interpolation
+            targetPositions[state.objectId] = state.position;
+            targetRotations[state.objectId] = Quaternion.Euler(state.rotation);
+
+            // Trigger visual drift effects and tire marks on the remote car
+            PrometeoCarController remoteController = remoteCar.GetComponent<PrometeoCarController>();
+
+            if (remoteController != null && remoteController.useEffects)
+            {
+                remoteController.isDrifting = state.isDrifting;
+                remoteController.isTractionLocked = state.isDrifting;
+                remoteController.DriftCarPS();
+            }
         }
     }
 
@@ -175,9 +296,6 @@ public class RaceSpawner : MonoBehaviour
 
         // Serialize to binary
         byte[] bytes = NetworkSerializer.SerializeCar(testId, testPos, testRot, testDrift);
-
-        // Check length, exactly 30 bytes
-        Debug.Log("[TEST] Serialized packet length: " + bytes.Length + " bytes");
 
         // Deserialize back
         UDPPlayer.CarNetworkState result = NetworkSerializer.DeserializeCar(bytes);

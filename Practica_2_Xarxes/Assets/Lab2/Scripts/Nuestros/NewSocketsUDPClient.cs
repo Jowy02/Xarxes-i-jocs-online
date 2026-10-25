@@ -35,6 +35,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     private float m_lastServerResponse;
 
     public static event Action<UDPPlayer.CarNetworkState> OnCarTransformReceived;
+    public static event Action OnRaceRestarted;
 
     // =============================================================================================
     // START / STOP
@@ -227,6 +228,13 @@ public class NewSocketsUDPClient : MonoBehaviour
             }
 
             UnityEngine.SceneManagement.SceneManager.LoadScene("RaceTrack");
+            return;
+        }
+
+        if (message.StartsWith("RESTART_RACE:"))
+        {
+            Debug.Log("[CLIENT] Race restarted by host.");
+            OnRaceRestarted?.Invoke();
             return;
         }
     }

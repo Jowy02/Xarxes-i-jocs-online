@@ -245,6 +245,13 @@ public class NewSocketsUDPServer : MonoBehaviour
             Broadcast(startMessage);
             return;
         }
+
+        if (text.StartsWith("RESTART_RACE:"))
+        {
+            Log("[SERVER] Restarting race for all players!");
+            Broadcast("RESTART_RACE:");
+            return;
+        }
     }
 
     // =============================================================================================
