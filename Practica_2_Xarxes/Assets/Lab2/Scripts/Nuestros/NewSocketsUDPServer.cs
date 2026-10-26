@@ -14,6 +14,8 @@ public class NewSocketsUDPServer : MonoBehaviour
     public bool showDebugUI = true;
 
     private List<UDPPlayer> m_players = new List<UDPPlayer>();
+    private List<UDPPlayer> m_standings= new List<UDPPlayer>();
+
     private int m_nextPlayerId = 0;
 
     const int MaxPacketSize = 64 * 1024;
@@ -225,6 +227,19 @@ public class NewSocketsUDPServer : MonoBehaviour
         if (text.StartsWith("CHAT:"))
         {
             Broadcast(text);
+            return;
+        }
+        if (text.StartsWith("LAP:"))
+        {
+            for (int i = 0; i < m_players.Count; i++)
+            {
+                if (m_players[i].endpoint.Equals(from))
+                {
+                    m_standings.Add(m_players[i]); // To make a table on the future
+                    if (m_standings.Count <= 1) Broadcast("CHAT:" + m_players[i].name + " WINS THE RACE");
+                    break;
+                }
+            }
             return;
         }
 
