@@ -11,6 +11,7 @@ something useful for your game. Best regards, Mena.
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -158,6 +159,11 @@ public class PrometeoCarController : MonoBehaviour
       WheelFrictionCurve RRwheelFriction;
       float RRWextremumSlip;
 
+    //Race Data
+     private List<GameObject> checkpoints = new List<GameObject>();
+     private List<GameObject> checkpointsTaken = new List<GameObject>();
+     private NewSocketsUDPClient client;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -259,7 +265,8 @@ public class PrometeoCarController : MonoBehaviour
             Debug.LogWarning(ex);
           }
         }
-
+        GameObject.FindGameObjectsWithTag("Checkpoint", checkpoints);
+        client = FindFirstObjectByType<NewSocketsUDPClient>();
     }
 
     // Update is called once per frame
@@ -769,6 +776,23 @@ public class PrometeoCarController : MonoBehaviour
 
         driftingAxis = 0f;
       }
+    }
+
+    private void OnTriggerEnter(Collider collision)
+    {
+        if (collision == null || checkpointsTaken.Contains(collision.gameObject)) return;
+        if (checkpoints.Contains(collision.gameObject))
+        {
+            checkpointsTaken.Add(collision.gameObject);
+            if (checkpointsTaken.Count >= checkpoints.Count)
+            {
+
+                client.SendString("CHAT:" + client.userName + ": make a lap");
+                checkpointsTaken.Clear();
+            }
+            return;
+        }
+        else return;
     }
 
 }

@@ -3,8 +3,8 @@ using TMPro;
 
 public class RaceChatUI : MonoBehaviour
 {
-    [SerializeField] private TMP_Text chatLog;
-    [SerializeField] private TMP_InputField chatInput;
+    [SerializeField] private TMPro.TMP_Text chatLog;
+    [SerializeField] private TMPro.TMP_InputField chatInput;
     [SerializeField] private GameObject chatPanel;
 
     private NewSocketsUDPClient client;
