@@ -7,7 +7,7 @@ public static class NetworkSerializer
     // SERIALIZATION
     // =============================================================================================
 
-    // Serializes car transform and gameplay state into a 22-byte binary payload
+    // Serializes car transform and gameplay state into a 30-byte binary payload
     public static byte[] SerializeCar(int objectId, Vector3 pos, Vector3 rot, bool isDrifting)
     {
         using (MemoryStream stream = new MemoryStream())
@@ -31,7 +31,7 @@ public static class NetworkSerializer
     // DESERIALIZATION
     // =============================================================================================
 
-    // Reads the 22-byte binary payload back into a CarNetworkState structure
+    // Reads the 30-byte binary payload back into a CarNetworkState structure
     public static UDPPlayer.CarNetworkState DeserializeCar(byte[] data)
     {
         using (MemoryStream stream = new MemoryStream(data))

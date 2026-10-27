@@ -31,7 +31,6 @@ public class RaceSpawner : MonoBehaviour
 
     void Start()
     {
-        TestSerializer();
 
         client = FindFirstObjectByType<NewSocketsUDPClient>();
 
