@@ -28,9 +28,6 @@ public class LobbyUDPUI : MonoBehaviour
     [SerializeField] private TMPro.TMP_InputField chatInput;
     [SerializeField] private GameObject chatPanel;
 
-
-    private bool isHost = false;
-
     void Start()
     {
         lobbyPanel.SetActive(true);
@@ -75,7 +72,7 @@ public class LobbyUDPUI : MonoBehaviour
             return;
         }
 
-        isHost = false;
+        client.isHost = false;
         client.userName = playerName;
         client.serverIp = address.ToString();
         client.StartNetwork();
@@ -91,13 +88,13 @@ public class LobbyUDPUI : MonoBehaviour
             lobbyPanel.SetActive(true);
             toggleLobbyButton.SetActive(false);
 
-            if (isHost)
+            if (client.isHost)
             {
                 server.Disconnect();
-                isHost = false;
+                client.isHost = false;
             }
         }
-        else if (isHost)
+        else if (client.isHost)
         {
             roleText.text = "Host";
         }
@@ -109,7 +106,7 @@ public class LobbyUDPUI : MonoBehaviour
         playersText.text = "Players:\n" + client.GetPlayerNames();
         chatLog.text = "Chat:\n" + client.GetChatLog();
 
-        if (isHost && client.IsRunning())
+        if (client.isHost && client.IsRunning())
         {
             startRaceButton.SetActive(true);
         }
@@ -134,7 +131,7 @@ public class LobbyUDPUI : MonoBehaviour
 
         if (!server.StartNetwork()) return;
 
-        isHost = true;
+        client.isHost = true;
         client.userName = playerName;
         client.serverIp = "127.0.0.1";
         client.port = server.port;
@@ -150,7 +147,7 @@ public class LobbyUDPUI : MonoBehaviour
         toggleChatButton.SetActive(false);
         chatPanel.SetActive(false);
 
-        isHost = false;
+        client.isHost = false;
         client.Disconnect();
         server.Disconnect();
         lobbyPanel.SetActive(true);
