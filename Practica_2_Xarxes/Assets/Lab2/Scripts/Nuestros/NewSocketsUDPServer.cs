@@ -35,6 +35,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     readonly List<string> m_log = new List<string>();
 
     volatile bool m_running;
+    private bool race_start = false;
 
     // =============================================================================================
     // START / STOP
@@ -237,6 +238,7 @@ public class NewSocketsUDPServer : MonoBehaviour
                 {
                     m_standings.Add(m_players[i]); // To make a table on the future
                     if (m_standings.Count <= 1) Broadcast("CHAT:" + m_players[i].name + " WINS THE RACE");
+                    else Broadcast("CHAT:" + m_players[i].name + " ends " + m_standings.Count.ToString());
                     break;
                 }
             }
@@ -258,6 +260,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             }
 
             Broadcast(startMessage);
+            race_start = true;
             return;
         }
 
@@ -265,6 +268,7 @@ public class NewSocketsUDPServer : MonoBehaviour
         {
             Log("[SERVER] Restarting race for all players!");
             Broadcast("RESTART_RACE:");
+            race_start = false;
             return;
         }
     }
@@ -407,6 +411,11 @@ public class NewSocketsUDPServer : MonoBehaviour
             if (m_players[i].endpoint.Equals(endpoint))
             {
                 Log("[SERVER] Player left: " + m_players[i].name);
+                if(race_start)
+                {
+                    GameObject temp =  GameObject.Find("Car_" + m_players[i].id.ToString());
+                    GameObject.Destroy(temp);
+                }
                 m_players.RemoveAt(i);
                 break;
             }
