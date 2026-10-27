@@ -9,15 +9,12 @@ something useful for your game. Best regards, Mena.
 */
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class PrometeoCarController : MonoBehaviour
 {
-
     //CAR SETUP
 
       [Space(20)]
@@ -812,5 +809,4 @@ public class PrometeoCarController : MonoBehaviour
             return;
         }
     }
-
 }

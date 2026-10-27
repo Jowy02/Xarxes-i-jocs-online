@@ -25,13 +25,6 @@ public class UDPPlayer
     }
 
     [Serializable]
-    public struct PlayerDTO
-    {
-        public string playerName;
-        public string msgType;
-        public Vector3 pos;
-        public string id;
-    }
     public enum MsgType : byte
     {
         Text = 1,
