@@ -54,10 +54,23 @@
 ## ⚡ 4. Latency Mitigation & Reliable Messaging
 
 ### A. How We Keep Lag Low:
-  Gagegigogu.
+1. **Compact Binary Serialization:**  
+   We eliminated JSON and text for gameplay. Using our custom `NetworkSerializer` (`MemoryStream`, `BinaryWriter`, and `BinaryReader`), the vehicle's transform and drifting state are packed into **exactly 30 bytes**:
+   **Type (1B) + ID (4B) + Position (12B) + Euler Rotation (12B) + Drift (1B) = 30 Bytes** 
+
+   Compared to standard JSON (~95 bytes), this is a **~68% bandwidth reduction**, we lower the socket buffer overhead and serialization latency.
+3. **Fixed Rate Update (20 Hz):** Updates are with a delta timer (`0.05s`) rather than on every graphic frame (`Update()`), preventing socket saturation and packet queuing on high refresh rate displays (144 Hz or more).
+4. **Client-Side Interpolation (Jitter Removal):** Remote vehicles do not snap abruptly to raw network coordinates, they smoothly interpolate position and rotation using `Vector3.Lerp` and `Quaternion.Slerp`, masking network jitter and frame discrepancies.
 
 ### B. Ensuring Important Messages Arrive (Reliability over UDP):
-  Gagegigogu.
+As not all data in game has the same importance, we treat it differently:
+
+* **Car Movement:** Positions are sent 20 times per second. If a packet gets lost, it doesn't matter, we don't resend it. 50 ms later a newer positions arrives and fixes it. Resending old positions would only create more lag.
+* **Important Messages (Start, Lap, Restart, Lobby):**  
+Events like `START_RACE:`, `RESTART_RACE:`, `LAP:`, `YOUR_ID:` only happen once. So to make sure they don't get lost:
+  *  We keep a **PING heartbet every 1 second** so the router's NAT table never closes the connection.
+  * The server always replies to the exact address provided by `ReceiveFrom`, avoiding NAT routing errors.
+  * We tried to replicate the **ACK ackowledgment system**, where the sender repeats the important message until the receiver sends back confirmation.
 
 ---
 
