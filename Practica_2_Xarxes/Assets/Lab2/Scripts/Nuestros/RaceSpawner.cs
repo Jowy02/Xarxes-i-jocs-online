@@ -65,12 +65,15 @@ public class RaceSpawner : MonoBehaviour
     {
         NewSocketsUDPClient.OnCarTransformReceived += UpdateRemoteCar;
         NewSocketsUDPClient.OnRaceRestarted += HandleRaceRestart;
+        NewSocketsUDPClient.OnFinishCountdown += ShowFinishCountdown;  
     }
 
     void OnDisable()
     {
         NewSocketsUDPClient.OnCarTransformReceived -= UpdateRemoteCar;
         NewSocketsUDPClient.OnRaceRestarted -= HandleRaceRestart;
+        NewSocketsUDPClient.OnFinishCountdown -= ShowFinishCountdown;  
+
     }
 
     void OnDestroy()
@@ -318,6 +321,23 @@ public class RaceSpawner : MonoBehaviour
         else
         {
             Debug.LogError("[TEST] SERIALIZATION FAIL!");
+        }
+    }
+
+    void ShowFinishCountdown(int secs)
+    {
+        StartCoroutine(FinishCountdownRoutine(secs));
+    }
+
+    IEnumerator FinishCountdownRoutine(int secs)
+    {
+        if (countdownText == null) yield break;
+        countdownText.gameObject.SetActive(true);
+        while (secs > 0)
+        {
+            countdownText.text = secs.ToString();
+            yield return new WaitForSeconds(1f);
+            secs--;
         }
     }
 }

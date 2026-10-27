@@ -30,10 +30,13 @@ public class LobbyUDPUI : MonoBehaviour
 
     void Start()
     {
-        lobbyPanel.SetActive(true);
-        toggleLobbyButton.SetActive(false);
-        chatPanel.SetActive(false);
-        toggleChatButton.SetActive(false);
+        client = NewSocketsUDPClient.Instance;
+        server = NewSocketsUDPServer.Instance;
+        bool connected = client.IsRunning();
+        lobbyPanel.SetActive(!connected);
+        toggleLobbyButton.SetActive(connected);
+        toggleChatButton.SetActive(connected);
+        chatPanel.SetActive(connected);
     }
 
     public void ToggleLobby()

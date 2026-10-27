@@ -577,6 +577,8 @@ MonoBehaviour:
   userName: Player
   autoStart: 0
   showDebugUI: 0
+  isHost: 0
+  lobbySceneName: LobbyUDP
 --- !u!1 &233794568
 GameObject:
   m_ObjectHideFlags: 0

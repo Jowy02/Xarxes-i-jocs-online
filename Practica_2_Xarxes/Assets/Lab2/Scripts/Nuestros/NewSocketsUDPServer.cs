@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using UnityEngine;
+using System.Globalization;
 
 public class NewSocketsUDPServer : MonoBehaviour
 {
@@ -15,6 +16,8 @@ public class NewSocketsUDPServer : MonoBehaviour
 
     private List<UDPPlayer> m_players = new List<UDPPlayer>();
     private List<UDPPlayer> m_standings= new List<UDPPlayer>();
+
+    public static NewSocketsUDPServer Instance;
 
     private int m_nextPlayerId = 0;
 
@@ -37,12 +40,16 @@ public class NewSocketsUDPServer : MonoBehaviour
     volatile bool m_running;
     private bool race_start = false;
 
+    private float m_endRaceTime = -1f;
+    private string m_bestLapName = "";
+    private float m_bestLapTime = float.MaxValue;
     // =============================================================================================
     // START / STOP
     // =============================================================================================
 
     void Start()
     {
+        if (Instance != this) return;
         Application.runInBackground = true;
         if (autoStart) StartNetwork();
     }
@@ -93,12 +100,15 @@ public class NewSocketsUDPServer : MonoBehaviour
 
     void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         Disconnect();
     }
 
     void Awake()
     {
-        DontDestroyOnLoad(this.gameObject);
+        if (Instance != null) { Destroy(gameObject); return; }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
     }
 
     // =============================================================================================
@@ -138,6 +148,7 @@ public class NewSocketsUDPServer : MonoBehaviour
 
             }
         }
+        if (m_endRaceTime > 0f && Time.time >= m_endRaceTime) EndRace();
     }
 
     // =============================================================================================
@@ -230,6 +241,24 @@ public class NewSocketsUDPServer : MonoBehaviour
             Broadcast(text);
             return;
         }
+        if (text.StartsWith("LAPTIME:"))
+        {
+            float t;
+            if (float.TryParse(text.Substring(8), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out t) && t < m_bestLapTime)
+            {
+                for (int i = 0; i < m_players.Count; i++)
+                {
+                    if (m_players[i].endpoint.Equals(from))
+                    {
+                        m_bestLapTime = t;
+                        m_bestLapName = m_players[i].name;
+                        break;
+                    }
+                }
+            }
+            return;
+        }
         if (text.StartsWith("LAP:"))
         {
             for (int i = 0; i < m_players.Count; i++)
@@ -237,7 +266,12 @@ public class NewSocketsUDPServer : MonoBehaviour
                 if (m_players[i].endpoint.Equals(from))
                 {
                     m_standings.Add(m_players[i]); // To make a table on the future
-                    if (m_standings.Count <= 1) Broadcast("CHAT:" + m_players[i].name + " WINS THE RACE");
+                    if (m_standings.Count <= 1)
+                    {
+                        Broadcast("CHAT:" + m_players[i].name + " WINS THE RACE");
+                        m_endRaceTime = Time.time + 30f;
+                        Broadcast("COUNTDOWN:30");
+                    }
                     else Broadcast("CHAT:" + m_players[i].name + " ends " + m_standings.Count.ToString());
                     break;
                 }
@@ -275,7 +309,7 @@ public class NewSocketsUDPServer : MonoBehaviour
                 PrometeoCarController controller = car.GetComponent<PrometeoCarController>();
                 if (controller != null) controller.restartLaps();
             }
-
+            m_endRaceTime = -1f; m_bestLapName = ""; m_bestLapTime = float.MaxValue;
             Broadcast("RESTART_RACE:");
             race_start = true;
 
@@ -433,5 +467,24 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         Broadcast("DISC:" + endpoint.ToString());
         SendPlayerList();
+    }
+    void EndRace()
+    {
+        m_endRaceTime = -1f;
+
+        Broadcast("CHAT:===STANDINGS:");
+        for (int i = 0; i < m_standings.Count; i++)
+            Broadcast("CHAT:" + (i + 1) + ". " + m_standings[i].name);
+
+        if (m_bestLapName != "")
+            Broadcast("CHAT:Fastest lap: " + m_bestLapName + " (" +
+                m_bestLapTime.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) + "s)");
+
+        Broadcast("RETURN_LOBBY:");
+
+        m_standings.Clear();
+        m_bestLapName = "";
+        m_bestLapTime = float.MaxValue;
+        race_start = false;
     }
 }

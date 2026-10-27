@@ -162,6 +162,8 @@ public class PrometeoCarController : MonoBehaviour
      private int totalLaps = 3;
      private int laps = 1;
      private NewSocketsUDPClient client;
+    private float lapStartTime;
+    private bool finished = false;
 
     // Start is called before the first frame update
     void Start()
@@ -266,6 +268,11 @@ public class PrometeoCarController : MonoBehaviour
         }
         GameObject.FindGameObjectsWithTag("Checkpoint", checkpoints);
         client = FindFirstObjectByType<NewSocketsUDPClient>();
+    }
+
+    void OnEnable()
+    {
+        lapStartTime = Time.time;
     }
 
     // Update is called once per frame
@@ -781,6 +788,7 @@ public class PrometeoCarController : MonoBehaviour
     {
         laps = 1;
         checkpointsTaken.Clear();
+        finished = false;
     }
 
     private void OnTriggerEnter(Collider collision)
@@ -796,9 +804,18 @@ public class PrometeoCarController : MonoBehaviour
             if (checkpointsTaken.Count >= checkpoints.Count)
             {
                 laps++;
-                if(laps > totalLaps)
+                if (client != null && !finished)
                 {
-                    client.SendString("LAP:" + client.userName);
+                    client.SendString("LAPTIME:" + (Time.time - lapStartTime).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    lapStartTime = Time.time;
+                }
+                if (laps > totalLaps)
+                {
+                    if (!finished)
+                    {
+                        finished = true;
+                        client.SendString("LAP:" + client.userName);
+                    }
                 }
                 else
                 {

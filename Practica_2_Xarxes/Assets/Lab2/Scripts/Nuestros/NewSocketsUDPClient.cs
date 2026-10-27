@@ -16,6 +16,11 @@ public class NewSocketsUDPClient : MonoBehaviour
     public bool showDebugUI = true;
     public bool isHost = false;
 
+    public string lobbySceneName = "Lobby";   // pon el nombre real en el Inspector
+    public static event Action<int> OnFinishCountdown;
+
+    public static NewSocketsUDPClient Instance;
+
     private int m_localPlayerId = -1;
 
     private List<string> m_players = new List<string>();
@@ -43,11 +48,14 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     void Awake()
     {
-        DontDestroyOnLoad(this.gameObject);
+        if (Instance != null) { Destroy(gameObject); return; }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
     }
 
     void Start()
     {
+        if (Instance != this) return;
         Application.runInBackground = true;
         if (autoStart) StartNetwork();
     }
@@ -88,6 +96,7 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     void OnDestroy()
     {
+        if (Instance == this) Instance = null;
         Disconnect();
     }
 
@@ -228,6 +237,20 @@ public class NewSocketsUDPClient : MonoBehaviour
             }
 
             UnityEngine.SceneManagement.SceneManager.LoadScene("RaceTrack");
+            return;
+        }
+
+        if (message.StartsWith("COUNTDOWN:"))
+        {
+            int secs;
+            if (int.TryParse(message.Substring(10), out secs)) OnFinishCountdown?.Invoke(secs);
+            return;
+        }
+
+        if (message == "RETURN_LOBBY:")
+        {
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "RaceTrack") return;
+            UnityEngine.SceneManagement.SceneManager.LoadScene(lobbySceneName);
             return;
         }
 
