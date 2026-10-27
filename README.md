@@ -1,152 +1,122 @@
-# Lab Sockets (TCP / UDP) - Lobby, Chat & UDP Minigame
-
-## 📝 Disclaimer Note UDP Deviation
-As discussed and agreed upon with the professor in class, our UDP implementation deviates slightly from the strict PDF requirements, duplicate the chat in UDP. Instead, **we implemented a real-time positional synchronization minigame**. 
-
-We chose this approach to demonstrate a more realistic use case for UDP in video games, sending fast, non-reliable positional data while still strictly fulfilling all the technical requirements: **Broadcast**, **PING heartbeats**, and **Server Timeout (5s) for disconnected players**.
+# Project deliverable: first iteration - Multiplayer Racing Game (UDP)
+**Subject:** Xarxes i Jocs Online  
+**Unity Version:** 6000.3.16f1  
+**GitHub Repository:** [https://github.com/Jowy02/Xarxes-i-jocs-online](https://github.com/Jowy02/Xarxes-i-jocs-online)  
 
 ---
 
-## 📖 Description
-This project is a low-level networking implementation in Unity using **C# Sockets**. It features two distinct network architectures:
-1. **TCP Implementation**: A connection-based Lobby system with a real-time chat, player list synchronization, and safe disconnect handling.
-2. **UDP Implementation**: A real-time minigame where players click to move a 3D capsule, synchronizing coordinates across all clients.
+## 🚀 1. How to Play & Test (Execution Guide)
 
-## ✨ Features & Architecture
+### Setup & Requirements
+* Download the executable `.exe` from the latest GitHub Release or build it directly from Unity.
+* The game must be tested on two separate PCs over a local network (LAN / Wi-Fi) or locally on one PC by launching two instances.
+* Port used: `9050` (UDP).
 
-**TCP (Lobby & Chat)**
-* **Command Protocol**: Structured messages (`JOIN:`, `CHAT:`, `PLAYERS:`, `LEAVE:`).
-* **State Synchronization**: Late joiners receive the active player list and the full message history when connecting.
+### Step-by-Step Instructions:
+1. **Host:**
+   * Launch the build.
+   * Enter your player name in the input field.
+   * Click **"Host Game"**. The UDP server starts listening on port `9050`, and a local client automatically connects. Your role will display as **Host**.
+2. **Client:**
+   * Launch the build on the second machine.
+   * Enter your player name and the **Local IP of the Host** (e.g., `192.168.1.XX` on LAN, or `127.0.0.1` if testing on the same PC).
+   * Click **"Join Game"**.
+3. **Waiting Room (Lobby):**
+   * Both players will see each other in the live player list and can exchange text messages using the integrated UDP chat.
+4. **Starting the Race:**
+   * The **Host** clicks the **"Start Race"** button.
+   * A synchronized network command triggers all connected clients to load the circuit scene (`RaceTrack`) simultaneously.
+5. **Race Controls:**
+   * **W / S**: Throttle / Reverse
+   * **A / D**: Steer Left / Steer Right
+   * **Space Bar**: Handbrake & Drift (triggers tire smoke particles and skid marks)
+   * **Chat Button On Sceen**: Toggle in-game race chat
 
-**UDP (Minigame)**
-* **Broadcasting**: Server relays `POS:x,y,z` , also used the coordinates to all known endpoints using `InvariantCulture` for cross-region decimal safety.
-* **Heartbeat System**: Clients send a `PING:` every 1 second.
-* **Timeout Disconnect**: The server actively checks the `m_lastSeen` dictionary every frame and kicks/destroys players who stop sending packets for 5 seconds (`DISC:`).
+---
 
-**⭐ Bonus Implemented**
-* **The Host also plays**: In the Create Game scene, clicking "Host" successfully starts the Server thread in the background and automatically connects a local Client to `127.0.0.1`, allowing the host to chat, appear in the list, and play the minigame alongside everyone else.
+## 🗺️ 2. Main Scene Structure
+* **Initial Scene:** `LobbyUDP`  
+  Gagegigogu.
+* **Game Scene:** `RaceTrack`  
+  Gagegigogu.
 
-## ⚙️ Installation
-Download the latest release from [here](https://github.com/Jowy02/Xarxes-i-jocs-online/releases), extract the zip and run the builds.
+---
 
-You can also open the project in Unity (6000.3.16f1) by importing the `.unitypackage` that comes with the release.
+## 🌐 3. Network Architecture: State vs Input
 
-To test on the same PC leave the Server IP as `127.0.0.1`. On a LAN use the host's IP.
-
-To test *UDP* , the Scene *LobbyUDP* is a combined version of the scene *S_UDP_Server* and *S_UDP_Client*, wich have the same functionalities but are separated versions of the UDP features.
-
-To test *TCP* , can be tested in the scene *S_TCP_Server* and *S_TCP_Client* , there is not combined version scene.
-
-## 🎮 Controls
-
-* **TCP Chat**: Keyboard (Type in the InputField and press Send).
-* **UDP Minigame**: **Left Mouse Click** on the 3D ground to move your capsule to that position.
-
-## 🚀 How to Play / Test
-
-<table>
-  <tr>
-    <td width="50%">
-      <img src="/Gifs/TCP_Chat.gif" width="100%" alt="TCP Chat">
-    </td>
-    <td>
-      <b>1. TCP Lobby & Chat</b><br>
-      Once connected in the TCP scene, you will see the updated player list. Type a message and click send to broadcast it to all connected players.
-    </td>
-  </tr>
-
-  <tr>
-    <td width="50%">
-      <img src="/Gifs/TCP_StopServer.gif" width="100%" alt="TCP Stop Server">
-    </td>
-    <td>
-      <b>2. TCP Stop Server</b><br>
-      When the Host clicks "Stop Server", the server safely closes all socket connections. Because TCP is stream-oriented, clients instantly detect the end of the stream, receiving 0 bytes, and safely disconnect on their end, returning to the main menu.
-    </td>
-  </tr>
+* **Input Synchronization:**
+  Gagegigogu.
+* **State Synchronization:**
+  Gagegigogu.
   
-  <tr>
-    <td width="50%">
-      <img src="/Gifs/TCP_ClientDisconnection.gif" width="100%" alt="TCP Client Disconnection">
-    </td>
-    <td>
-      <b>3. TCP Client Disconnection</b><br>
-      When a Client clicks "Disconnect", it sends a `LEAVE:` command to the server before closing its socket. The server then safely removes the player from the active players list and broadcasts the updated player list to all remaining clients.
-    </td>
-  </tr>
-  
-  <tr>
-    <td width="50%">
-      <img src="/Gifs/TCP_ForceClose.gif" width="100%" alt="TCP Force Close">
-    </td>
-    <td>
-      <b>4. TCP Force Close</b><br>
-      If a client crashes or the window is force-closed (Alt+F4), the socket connection breaks abruptly. The server catches this SocketException, identifies the disconnected client, removes them from the active players list, and broadcasts the updated list to the remaining players so no "ghost clients" are left behind. Also, if the Host (Server) is force-closed, the connected clients will detect the broken connection, and handle the exception.
-    </td>
-  </tr>
-  
-  <tr>
-    <td width="50%">
-      <img src="/Gifs/UDP_Lobby.gif" width="100%" alt="Lobby UDP">
-    </td>
-    <td>
-      <b>5. UDP Host or Join a Game</b><br>
-      Open the Create/Join Lobby. Enter your username. If you want to host, click "Host". If you want to join a friend, enter their IP address and click "Join".
-    </td>
-  </tr>
+---
 
-  <tr>
-    <td width="50%">
-      <img src="/Gifs/UDP_Minigame.gif" width="100%" alt="UDP Minigame">
-    </td>
-    <td>
-      <b>6. UDP Minigame</b><br>
-      Click anywhere on the ground. A red capsule will appear and move to your cursor's position instantly on all clients' screens.
-    </td>
-  </tr>
+## ⚡ 4. Latency Mitigation & Reliable Messaging
 
-  <tr>
-    <td width="50%">
-      <img src="/Gifs/UDP_Disconnection.gif" width="100%" alt="UDP Minigame">
-    </td>
-    <td>
-      <b>7. UDP Server Disconnection</b><br>
-      If the Host (Server) disconnects or the server window is closed, it stops broadcasting and acknowledging packets. The remaining clients will eventually fail to receive updates or hit their own internal timeout, 5s, for the server's heartbeat, automatically disconnecting and safely returning to the main menu.
-    </td>
-  </tr>
-  
-  <tr>
-    <td width="50%">
-      <img src="/Gifs/UDP_Timeout.gif" width="100%" alt="Timeout System">
-    </td>
-    <td>
-      <b>8. Test the Timeout (PING)</b><br>
-      To test a forced connection drop, playing with someone, the player has to switch off Wi-fi. Wait 5 seconds. The server will detect the missing PINGs, and order the remaining clients to destroy the disconnected player's capsule.
-    </td>
-  </tr>
-</table>
+### A. How We Keep Lag Low:
+  Gagegigogu.
 
-<p align="center">
-  <br>
-  <strong>HAVE FUN!</strong>
-</p>
-     
-## 👥 Credits
-**All contributors working on this project**:
+### B. Ensuring Important Messages Arrive (Reliability over UDP):
+  Gagegigogu.
 
-_Pablo Sanjose_ « **Github**: [XXPabloS](https://github.com/XXPabloS)
+---
 
-_Ana Alcaraz_ « **Github**: [Audra0000](https://github.com/Audra0000)
+## 🏆 5. EXTRAS IMPLEMENTED
 
-_Haosheng Li_ « **Github**: [HaosLii](https://github.com/HaosLii)
+We wanted to deliver a polished multiplayer experience, so we made some extras:
 
-_Joel Vicente_ « **Github**: [Jowy02](https://github.com/Jowy02)
+1. **Full 3D Elevation & Banked Movement (Pitch, Yaw, Roll):**  
+   Gagegigogu.
+2. **Synchronized Car Action: Drifting:**  
+   Gagegigogu.
+3. **Multiplayer Scalability (>2 Players):**  
+  Gagegigogu.
+4. **Environment & Car-to-Car Solid Collisions:**  
+   Gagegigogu.
+5. **Synchronized 5-Second Countdown:**  
+   Gagegigogu.
+6. **Full Game Loop (Lap Detection & Win Condition):**  
+   Gagegigogu.
+7. **Host Race Restart System:**  
+   Gagegigogu.
+8. **Gagegigogu:**  
+   Gagegigogu.
 
-_Arthur Cordoba_ « **Github**: [000Arthur](https://github.com/000Arthur)
+---
 
-## ⚠️ Known Issues / Limitations
-* In the UDP Minigame, overlapping capsules do not have collision physics implemented yet, as the focus of the lab is purely on network packet delivery and synchronization.
-* Make sure both the Host and Client are running on the same network or have the correct port (`9050`) on their router.
+## 🔄 6. Detailed Changes Since The Last Delivery
 
-## ⚖️ Disclaimer
-This project is an **academic and non-commercial project** created for educational purposes only.
+
+---
+
+## 🐛 7. Known Bugs / Limitations
+* If a player disconnects abruptly by force-closing the window (Alt+F4) without pressing disconnect, their car will remain stationary on the track until the server's 5-second timeout cleans up.
+* If a extreme packet loss over an unstable Wi-Fi occurs, it may cause interpolation lag drift corners before the next packet arrives.
+
+---
+
+## 👥 8. Team Members & Contributions
+
+* **Ana Alcaraz ([Audra0000](https://github.com/Audra0000)):**  
+  Worked on: ...
+
+* **Arthur Cordoba ([000Arthur](https://github.com/000Arthur)):**  
+  Worked on: ...
+
+* **Haosheng Li ([HaosLii](https://github.com/HaosLii)):**  
+  Worked on: ...
+
+* **Pablo Sanjose ([XXPabloS](https://github.com/XXPabloS)):**  
+  Worked on:
+  * RaceTrack Scene and built the circuit.
+  * Start Race Button for host and the synchronized scene loading trigger.
+  * Starting grid spawn points car system.
+  * Capsule Minigame removed.
+  * Fix on serialization and Capsule Minigame removed, replacing JSON text with native binary serialization.
+  * Jitter Removal with Vector3.Lerp and Quaternion.Slerp interpolation.
+  * Restart Race functionality.
+  * Drift Marks.
+
+* **Joel Vicente ([Jowy02](https://github.com/Jowy02)):**  
+  Worked on: ...
+
