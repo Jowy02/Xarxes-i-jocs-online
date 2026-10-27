@@ -218,6 +218,11 @@ public class RaceSpawner : MonoBehaviour
     {
         StopAllCoroutines();
 
+        if (localController != null)
+        {
+            localController.restartLaps();
+        }
+
         // Reposition all cars to starting grid
         int[] playerIds = client.GetRacePlayerIds();
 

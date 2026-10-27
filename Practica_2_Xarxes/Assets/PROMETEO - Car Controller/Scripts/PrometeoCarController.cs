@@ -782,15 +782,20 @@ public class PrometeoCarController : MonoBehaviour
 
     public void restartLaps()
     {
-        laps = 0;
+        laps = 1;
         checkpointsTaken.Clear();
     }
+
     private void OnTriggerEnter(Collider collision)
     {
+        if (!enabled) return;
+
         if (collision == null || checkpointsTaken.Contains(collision.gameObject)) return;
+
         if (checkpoints.Contains(collision.gameObject))
         {
             checkpointsTaken.Add(collision.gameObject);
+
             if (checkpointsTaken.Count >= checkpoints.Count)
             {
                 laps++;
@@ -798,12 +803,14 @@ public class PrometeoCarController : MonoBehaviour
                 {
                     client.SendString("LAP:" + client.userName);
                 }
-                else client.SendString("CHAT:" + client.userName + ": make a lap " + laps.ToString() + "/" + totalLaps.ToString());
+                else
+                {
+                    client.SendString("CHAT:" + client.userName + ": make a lap " + (laps - 1) + "/" + totalLaps);
+                }
                 checkpointsTaken.Clear();
             }
             return;
         }
-        else return;
     }
 
 }

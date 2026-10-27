@@ -267,11 +267,17 @@ public class NewSocketsUDPServer : MonoBehaviour
         if (text.StartsWith("RESTART_RACE:"))
         {
             Log("[SERVER] Restarting race for all players!");
+
+            m_standings.Clear();
+
             foreach (GameObject car in GameObject.FindGameObjectsWithTag("Car_"))
-                car.GetComponent<PrometeoCarController>().restartLaps();
+            {
+                PrometeoCarController controller = car.GetComponent<PrometeoCarController>();
+                if (controller != null) controller.restartLaps();
+            }
 
             Broadcast("RESTART_RACE:");
-            race_start = false;
+            race_start = true;
 
             return;
         }
