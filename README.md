@@ -134,8 +134,11 @@ Compared with the previous delivery, this version introduces a multiplayer car r
 ---
 
 ## 🐛 7. Known Bugs / Limitations
-* If a player disconnects abruptly by force-closing the window (Alt+F4) without pressing disconnect, their car will remain stationary on the track until the server's 5-second timeout cleans up.
-* If a extreme packet loss over an unstable Wi-Fi occurs, it may cause interpolation lag drift corners before the next packet arrives.
+* If a player disconnects abruptly by force-closing the game window (Alt+F4) without using the disconnect option, their car will remain stationary on the track until the server's 5-second timeout cleans it up.
+* Severe packet loss caused by an unstable Wi-Fi connection may result in interpolation drift, causing cars to appear to slide around corners until the next packet arrives.
+* The in-game chat does not adapt to different screen resolutions or aspect ratios and needs further visual refinement.
+* Lap counts should be displayed in the main UI rather than only in the chat.
+* Game loop and lobby navigation require further improvements. Server disconnection, lobby exit, and return-to-main-menu functionality are not yet fully implemented.
 
 ---
 
