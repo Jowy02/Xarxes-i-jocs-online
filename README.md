@@ -43,12 +43,16 @@ Contains the race environment, track layout, car spawning system, and in-game ga
 ---
 
 ## 🌐 3. Network Architecture: State vs Input
-
+We send state, not input.
 * **Input Synchronization:**
-  Gagegigogu.
+Not used. Keyboard inputs (W/A/S/D/Space) are only processed locally by PrometeoCarController and are never sent. Only discrete events (START_RACE:, RESTART_RACE:, CHAT:, LEAVE:) travel as text messages.
 * **State Synchronization:**
-  Gagegigogu.
-  
+Each client simulates its own car locally and sends its resulting state (ID, position, rotation and drift flag) in a 30-byte binary packet at 20 Hz. The server relays it to the other clients, where the remote car is kinematic and smoothly interpolated towards the received state.
+
+### **Why State?**
+- No physics divergence: Rigidbody physics is not deterministic across machines, so simulating other players’ inputs locally would make cars drift apart.
+- Tolerant to packet loss: a lost packet is harmless because the next one (50 ms later) contains the full up-to-date state.
+- Simple and cheap: no lockstep or rollback is needed, and 30 bytes at 20 Hz is affordable for up to 12 players.
 ---
 
 ## ⚡ 4. Latency Mitigation & Reliable Messaging
@@ -125,7 +129,11 @@ We wanted to deliver a polished and engaging multiplayer experience with greater
 ## 👥 8. Team Members & Contributions
 
 * **Ana Alcaraz ([Audra0000](https://github.com/Audra0000)):**  
-  Worked on: ...
+  Worked on:
+  * Ported the UDP chat system (originally developed by Joel for the lobby) and its Canvas UI to the `RaceTrack` scene.
+  * Added the `RaceChatUI` script to adapt the chat to the race scene.
+  * Race-end flow: 30 second countdown after the first winner, then all players return to the waiting room.
+  * Post-race results: final standings and fastest lap shown in the lobby chat.
 
 * **Arthur Cordoba ([000Arthur](https://github.com/000Arthur)):**  
   Worked on:
