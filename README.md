@@ -13,6 +13,10 @@
 * The game must be tested on two separate PCs over a local network (LAN / Wi-Fi) or locally on one PC by launching two instances.
 * Port used: `9050` (UDP).
 
+> ⚠️ **CRITICAL NOTES FOR UNITY EDITOR SETUP:**  
+> 1. Copy and replace the `EditorBuildSettings.asset` file inside your project's `ProjectSettings` folder, and then open the `LobbyUDP` scene.  
+> 2. Change player input settings to **Both**: navigate to `Edit` → `Project Settings` → `Player` → `Other Settings` → `Active Input Handling` and set it to **Both**.
+
 ### Step-by-Step Instructions:
 1. **Host:**
    * Launch the build.
