@@ -18,6 +18,9 @@ public class RaceSpawner : MonoBehaviour
 
     private GameObject localCar;
     private PrometeoCarController localController;
+    
+    //For local Scrips
+    public GameObject LocalCar => localCar;
 
     // Cars
     private Dictionary<int, GameObject> cars = new Dictionary<int, GameObject>();
