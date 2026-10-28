@@ -117,6 +117,19 @@ We wanted to deliver a polished and engaging multiplayer experience with greater
 
 ## 🔄 6. Detailed Changes Since The Last Delivery
 
+Compared with the previous delivery, this version introduces a multiplayer car race.
+
+- **Lobby to race transition:** The host can request a race start from the lobby. The server distributes the participant IDs and clients load `RaceTrack` while keeping their network connections active.
+
+- **Player identification and starting grid:** The server assigns each player a unique ID. Each client creates one car per participant, using the same player list and spawn point order. Car creation supports multiple participants, currently with a maximum of 12.
+
+- **Local controls and camera:** Each player controls only their own car and their camera follows it. Input controllers are disabled on remote cars.
+
+- **Binary vehicle serialization:** Car movement replaces the previous JSON position messages with `NetworkSerializer`. Each 30-byte payload contains the message type, object ID, three position values, three Euler rotation values and a drifting flag. Pitch, yaw and roll are transmitted, allowing remote cars to reproduce slopes and banked turns.
+
+- **Networked car movement:** Cars replace the previous capsule minigame. Each client sends its car state approximately 20 times per second over UDP. The server forwards these updates to the other clients, which smoothly move and rotate the corresponding remote cars towards the received state.
+
+- **In-race chat:** The UDP chat is available in `RaceTrack`, so players can communicate without returning to the lobby. Race announcements and results also use the chat log.
 
 ---
 
@@ -144,7 +157,11 @@ We wanted to deliver a polished and engaging multiplayer experience with greater
   * Asset placement adjustments.
 
 * **Haosheng Li ([HaosLii](https://github.com/HaosLii)):**  
-  Worked on: ...
+  Worked on: 
+  * Improved the UDP lobby interface.
+  * Player ID assignment and distribution of the race participant list.
+  * Spawning one car per player at the assigned starting position.
+  * Sending local car states and applying received updates to remote cars.
 
 * **Pablo Sanjose ([XXPabloS](https://github.com/XXPabloS)):**  
   Worked on:
