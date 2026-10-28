@@ -36,9 +36,9 @@
 
 ## 🗺️ 2. Main Scene Structure
 * **Initial Scene:** `LobbyUDP`  
-  Gagegigogu.
+Handles the initial lobby setup, player connections, and core multiplayer functionality. Players can choose to **Host** a match, becoming the session leader and managing the game session, or **Join** a match to search for and connect to hosted sessions before the race begins. Essential multiplayer session data is preserved during the transition to `RaceTrack` to maintain session continuity.
 * **Game Scene:** `RaceTrack`  
-  Gagegigogu.
+Contains the race environment, track layout, car spawning system, and in-game gameplay elements. It supports multiplayer racing as well as single-player testing using host-assigned player configurations. Gameplay features include car synchronization, in-game chat, and local turn indicators.
 
 ---
 
@@ -114,7 +114,12 @@ We wanted to deliver a polished multiplayer experience, so we made some extras:
   Worked on: ...
 
 * **Arthur Cordoba ([000Arthur](https://github.com/000Arthur)):**  
-  Worked on: ...
+  Worked on:
+  * Initial UDP-based chat system for lobby and in-game player communication.
+  * Local turn indicator UI system with trigger-based activation.
+  * Design and creation of 2D textures for directional arrows.
+  * Map collision and track boundary improvements.
+  * Asset placement adjustments.
 
 * **Haosheng Li ([HaosLii](https://github.com/HaosLii)):**  
   Worked on: ...
