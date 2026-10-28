@@ -171,7 +171,6 @@ public class NewSocketsUDPClient : MonoBehaviour
 
             return;
         }
-
         if (message == "SERVER_ACTIVE")
         {
             m_lastServerResponse = Time.realtimeSinceStartup;
@@ -197,6 +196,17 @@ public class NewSocketsUDPClient : MonoBehaviour
 
             Debug.Log("[CLIENT] Players: " + names);
             return;
+        }
+        if (message.StartsWith("DISC:"))
+        {
+            string playerText = message.Substring(5);
+            string[] parts = playerText.Split(',');
+            if (m_racePlayerIds.Count > 0)
+            {
+                GameObject temp = GameObject.Find(parts[0]);
+                GameObject.Destroy(temp);
+                m_racePlayerIds.Remove(int.Parse(parts[1]));
+            }
         }
 
         if (message.StartsWith("CHAT:"))
@@ -235,7 +245,6 @@ public class NewSocketsUDPClient : MonoBehaviour
 
                 m_racePlayerIds.Add(playerId);
             }
-
             UnityEngine.SceneManagement.SceneManager.LoadScene("RaceTrack");
             return;
         }

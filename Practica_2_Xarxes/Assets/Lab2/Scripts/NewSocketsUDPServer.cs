@@ -449,7 +449,8 @@ public class NewSocketsUDPServer : MonoBehaviour
         lock (m_lastSeen) m_lastSeen.Remove(endpoint);
 
         lock (m_knownClients) m_knownClients.Remove(endpoint);
-
+        string carToRemove = "";
+        int playersId = -1;
         for (int i = 0; i < m_players.Count; i++)
         {
             if (m_players[i].endpoint.Equals(endpoint))
@@ -457,15 +458,15 @@ public class NewSocketsUDPServer : MonoBehaviour
                 Log("[SERVER] Player left: " + m_players[i].name);
                 if(race_start)
                 {
-                    GameObject temp =  GameObject.Find("Car_" + m_players[i].id.ToString());
-                    GameObject.Destroy(temp);
+                    carToRemove = "Car_" + m_players[i].id.ToString();
+                    playersId = m_players[i].id;
                 }
                 m_players.RemoveAt(i);
                 break;
             }
         }
 
-        Broadcast("DISC:" + endpoint.ToString());
+        Broadcast("DISC:" + carToRemove + "," + playersId);
         SendPlayerList();
     }
     void EndRace()
