@@ -140,6 +140,7 @@ Compared with the previous delivery, this version introduces a multiplayer car r
 * The in-game chat does not adapt to different screen resolutions or aspect ratios and needs further visual refinement.
 * Lap counts should be displayed in the main UI rather than only in the chat.
 * Game loop and lobby navigation require further improvements. Server disconnection, lobby exit, and return-to-main-menu functionality are not yet fully implemented.
+* If a player keeps holding any movement key (W, A, S or D) during a race restart, their car may continue moving or turning after returning to its starting position.
 
 ---
 
