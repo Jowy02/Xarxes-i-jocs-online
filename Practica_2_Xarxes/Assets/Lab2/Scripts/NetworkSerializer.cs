@@ -21,7 +21,7 @@ public static class NetworkSerializer
             writer.Write(rot.x);                             // Bytes 17-20: Pitch Inclination
             writer.Write(rot.y);                             // Bytes 21-24: Yaw Turn
             writer.Write(rot.z);                             // Bytes 25-28: Roll Banked curve
-            writer.Write(isDrifting);                        // Byte 21: Drift
+            writer.Write(isDrifting);                        // Byte 29: Drift
 
             return stream.ToArray();
         }

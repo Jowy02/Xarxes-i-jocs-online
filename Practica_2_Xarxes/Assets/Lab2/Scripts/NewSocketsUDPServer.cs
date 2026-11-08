@@ -169,7 +169,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             break;
 
             case UDPPlayer.MsgType.Transform:
-                // Binary gameplay packet (22 bytes): update keep-alive and broadcast raw payload
+                // Binary gameplay packet (30 bytes): update keep-alive and broadcast raw payload
                 lock (m_lastSeen) m_lastSeen[from] = Time.time;
                 BroadcastRaw(data, from);
             break;
@@ -298,6 +298,12 @@ public class NewSocketsUDPServer : MonoBehaviour
             return;
         }
 
+        if (text.StartsWith("READY_FOR_COUNTDOWN:"))
+        {
+            Broadcast("START_COUNTDOWN:5");
+            return;
+        }
+
         if (text.StartsWith("RESTART_RACE:"))
         {
             Log("[SERVER] Restarting race for all players!");
@@ -306,11 +312,15 @@ public class NewSocketsUDPServer : MonoBehaviour
 
             foreach (GameObject car in GameObject.FindGameObjectsWithTag("Car_"))
             {
-                PrometeoCarController controller = car.GetComponent<PrometeoCarController>();
-                if (controller != null) controller.restartLaps();
+                LapManager lapManager = car.GetComponent<LapManager>();
+                if (lapManager != null) lapManager.RestartLaps();
             }
-            m_endRaceTime = -1f; m_bestLapName = ""; m_bestLapTime = float.MaxValue;
+
+            m_endRaceTime = -1f;
+            m_bestLapName = "";
+            m_bestLapTime = float.MaxValue;
             Broadcast("RESTART_RACE:");
+            Broadcast("START_COUNTDOWN:5");
             race_start = true;
 
             return;

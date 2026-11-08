@@ -41,6 +41,7 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     public static event Action<UDPPlayer.CarNetworkState> OnCarTransformReceived;
     public static event Action OnRaceRestarted;
+    public static event Action OnStartCountdownReceived;
 
     // =============================================================================================
     // START / STOP
@@ -137,8 +138,8 @@ public class NewSocketsUDPClient : MonoBehaviour
         // Stop the client after five seconds without a server response
         if (Time.realtimeSinceStartup - m_lastServerResponse >= 5f)
         {
-            Debug.Log("[CLIENT] Server timed out.");
-            Disconnect();
+            Debug.Log("[CLIENT] Server connection timed out. Returning to Lobby...");
+            HandleHostLost();
             return;
         }
 
@@ -148,6 +149,16 @@ public class NewSocketsUDPClient : MonoBehaviour
         {
             SendString("PING:");
             m_pingTimer = 1f;
+        }
+    }
+
+    void HandleHostLost()
+    {
+        Disconnect();
+        // Return to lobby if dropped during a race
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "RaceTrack")
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene(lobbySceneName);
         }
     }
 
@@ -267,6 +278,12 @@ public class NewSocketsUDPClient : MonoBehaviour
         {
             Debug.Log("[CLIENT] Race restarted by host.");
             OnRaceRestarted?.Invoke();
+            return;
+        }
+
+        if (message.StartsWith("START_COUNTDOWN:"))
+        {
+            OnStartCountdownReceived?.Invoke();
             return;
         }
     }

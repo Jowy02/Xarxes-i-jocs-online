@@ -18,7 +18,7 @@ public class RaceSpawner : MonoBehaviour
 
     private GameObject localCar;
     private PrometeoCarController localController;
-    
+
     //For local Scrips
     public GameObject LocalCar => localCar;
 
@@ -60,14 +60,29 @@ public class RaceSpawner : MonoBehaviour
         }
 
         SpawnCars(playerIds);
-        StartCoroutine(StartCountdownRoutine());
+
+        // Tell the server we are ready for the starting countdown (host triggers it)
+        if (client.isHost)
+        {
+            StartCoroutine(TriggerServerCountdownDelay());
+        }
+    }
+
+    IEnumerator TriggerServerCountdownDelay()
+    {
+        yield return new WaitForSeconds(0.5f); // Short buffer to ensure all scenes loaded
+        if (client != null && client.IsRunning())
+        {
+            client.SendString("READY_FOR_COUNTDOWN:");
+        }
     }
 
     void OnEnable()
     {
         NewSocketsUDPClient.OnCarTransformReceived += UpdateRemoteCar;
         NewSocketsUDPClient.OnRaceRestarted += HandleRaceRestart;
-        NewSocketsUDPClient.OnFinishCountdown += ShowFinishCountdown;  
+        NewSocketsUDPClient.OnFinishCountdown += ShowFinishCountdown;
+        NewSocketsUDPClient.OnStartCountdownReceived += HandleStartCountdown;
     }
 
     void OnDisable()
@@ -75,7 +90,7 @@ public class RaceSpawner : MonoBehaviour
         NewSocketsUDPClient.OnCarTransformReceived -= UpdateRemoteCar;
         NewSocketsUDPClient.OnRaceRestarted -= HandleRaceRestart;
         NewSocketsUDPClient.OnFinishCountdown -= ShowFinishCountdown;  
-
+        NewSocketsUDPClient.OnStartCountdownReceived -= HandleStartCountdown;
     }
 
     void OnDestroy()
@@ -96,11 +111,8 @@ public class RaceSpawner : MonoBehaviour
 
     void Update()
     {
-        if (raceStarted)
-        {
-            SendLocalCarState();
-        }
-
+        SendLocalCarState();
+        
         SmoothRemoteCars();
     }
 
@@ -169,13 +181,46 @@ public class RaceSpawner : MonoBehaviour
     }
 
     // 5 Seconds countdown timer
+    void HandleStartCountdown()
+    {
+        StopAllCoroutines();
+        StartCoroutine(StartCountdownRoutine());
+    }
+
     IEnumerator StartCountdownRoutine()
     {
         raceStarted = false;
 
         if (localController != null)
         {
+            localController.ResetCarForces();
             localController.enabled = false;
+        }
+
+        foreach (KeyValuePair<int, GameObject> entry in cars)
+        {
+            if (entry.Value != null)
+            {
+                PrometeoCarController pController = entry.Value.GetComponent<PrometeoCarController>();
+                if (pController != null)
+                {
+                    pController.ResetCarForces();
+                }
+
+                ParticleSystem[] parts = entry.Value.GetComponentsInChildren<ParticleSystem>();
+                foreach (ParticleSystem ps in parts)
+                {
+                    ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+                    ps.Clear(true);
+                }
+
+                TrailRenderer[] trails = entry.Value.GetComponentsInChildren<TrailRenderer>();
+                foreach (TrailRenderer tr in trails)
+                {
+                    tr.emitting = false;
+                    tr.Clear();
+                }
+            }
         }
 
         int count = 5;
@@ -222,10 +267,11 @@ public class RaceSpawner : MonoBehaviour
     void HandleRaceRestart()
     {
         StopAllCoroutines();
+        raceStarted = false;
 
         if (localController != null)
         {
-            localController.restartLaps();
+            localController.enabled = false;
         }
 
         // Reposition all cars to starting grid
@@ -242,16 +288,17 @@ public class RaceSpawner : MonoBehaviour
                 targetPositions[pId] = spawnPoints[i].position;
                 targetRotations[pId] = spawnPoints[i].rotation;
 
-                Rigidbody rb = car.GetComponent<Rigidbody>();
-                if (rb != null)
+                PrometeoCarController controller = car.GetComponent<PrometeoCarController>();
+                if (controller != null)
                 {
-                    rb.linearVelocity = Vector3.zero;
-                    rb.angularVelocity = Vector3.zero;
+                    controller.ResetCarForces();
                 }
             }
         }
-
-        StartCoroutine(StartCountdownRoutine());
+        if (localCar != null && client != null && client.IsRunning())
+        {
+            client.SendCarTransform(localPlayerId, localCar.transform.position, localCar.transform.eulerAngles, false);
+        }
     }
 
     void SendLocalCarState()
@@ -277,52 +324,44 @@ public class RaceSpawner : MonoBehaviour
 
         if (cars.TryGetValue(state.objectId, out remoteCar) && remoteCar != null)
         {
-            // Store targets for interpolation
+            PrometeoCarController remoteController = remoteCar.GetComponent<PrometeoCarController>();
+            float distance = Vector3.Distance(remoteCar.transform.position, state.position);
+            if (distance > 8f)
+            {
+                remoteCar.transform.position = state.position;
+                remoteCar.transform.rotation = Quaternion.Euler(state.rotation);
+                targetPositions[state.objectId] = state.position;
+                targetRotations[state.objectId] = Quaternion.Euler(state.rotation);
+
+                if (remoteController != null)
+                {
+                    remoteController.ResetCarForces();
+                }
+                return;
+            }
+
             targetPositions[state.objectId] = state.position;
             targetRotations[state.objectId] = Quaternion.Euler(state.rotation);
 
-            // Trigger visual drift effects and tire marks on the remote car
-            PrometeoCarController remoteController = remoteCar.GetComponent<PrometeoCarController>();
-
             if (remoteController != null && remoteController.useEffects)
             {
-                remoteController.isDrifting = state.isDrifting;
-                remoteController.isTractionLocked = state.isDrifting;
-                remoteController.DriftCarPS();
+                if (!raceStarted)
+                {
+                    remoteController.isDrifting = false;
+                    remoteController.isTractionLocked = false;
+
+                    if (remoteController.RLWParticleSystem != null) remoteController.RLWParticleSystem.Clear(true);
+                    if (remoteController.RRWParticleSystem != null) remoteController.RRWParticleSystem.Clear(true);
+                    if (remoteController.RLWTireSkid != null) remoteController.RLWTireSkid.Clear();
+                    if (remoteController.RRWTireSkid != null) remoteController.RRWTireSkid.Clear();
+                }
+                else
+                {
+                    remoteController.isDrifting = state.isDrifting;
+                    remoteController.isTractionLocked = state.isDrifting;
+                    remoteController.DriftCarPS();
+                }
             }
-        }
-    }
-
-    // =============================================================================================
-    // SERIALIZER TEST
-    // =============================================================================================
-
-    void TestSerializer()
-    {
-        Vector3 testPos = new Vector3(15.2f, 0.5f, -88.4f);
-        Vector3 testRot = new Vector3(12.5f, 180.0f, -4.2f);
-        bool testDrift = true;
-        int testId = 1;
-
-        // Serialize to binary
-        byte[] bytes = NetworkSerializer.SerializeCar(testId, testPos, testRot, testDrift);
-
-        // Deserialize back
-        UDPPlayer.CarNetworkState result = NetworkSerializer.DeserializeCar(bytes);
-
-        // Verify values
-        bool pass = (result.objectId == testId) &&
-                    (Vector3.Distance(result.position, testPos) < 0.001f) &&
-                    (Vector3.Distance(result.rotation, testRot) < 0.001f) &&
-                    (result.isDrifting == testDrift);
-
-        if (pass && bytes.Length == 30)
-        {
-            Debug.Log("<color=green>[TEST] SERIALIZATION PASS! Exact 30 bytes in pure binary.</color>");
-        }
-        else
-        {
-            Debug.LogError("[TEST] SERIALIZATION FAIL!");
         }
     }
 

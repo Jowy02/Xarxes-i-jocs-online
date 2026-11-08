@@ -266,8 +266,6 @@ public class PrometeoCarController : MonoBehaviour
             Debug.LogWarning(ex);
           }
         }
-        GameObject.FindGameObjectsWithTag("Checkpoint", checkpoints);
-        client = FindFirstObjectByType<NewSocketsUDPClient>();
     }
 
     void OnEnable()
@@ -703,11 +701,11 @@ public class PrometeoCarController : MonoBehaviour
       if(useEffects){
         try{
           if(isDrifting){
-            RLWParticleSystem.Play();
-            RRWParticleSystem.Play();
+            if (!RLWParticleSystem.isPlaying) RLWParticleSystem.Play();
+            if (!RRWParticleSystem.isPlaying) RRWParticleSystem.Play();
           }else if(!isDrifting){
-            RLWParticleSystem.Stop();
-            RRWParticleSystem.Stop();
+           RLWParticleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+           RRWParticleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
           }
         }catch(Exception ex){
           Debug.LogWarning(ex);
@@ -726,10 +724,10 @@ public class PrometeoCarController : MonoBehaviour
         }
       }else if(!useEffects){
         if(RLWParticleSystem != null){
-          RLWParticleSystem.Stop();
+          RLWParticleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
         if(RRWParticleSystem != null){
-          RRWParticleSystem.Stop();
+          RRWParticleSystem.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
         }
         if(RLWTireSkid != null){
           RLWTireSkid.emitting = false;
@@ -825,5 +823,78 @@ public class PrometeoCarController : MonoBehaviour
             }
             return;
         }
+    }
+
+    // =============================================================================================
+    // RESET CAR INPUTS & PHYSICS
+    // =============================================================================================
+
+    public void ResetCarForces()
+    {
+        // Reset input axes
+        throttleAxis = 0f;
+        steeringAxis = 0f;
+        driftingAxis = 0f;
+        isDrifting = false;
+        isTractionLocked = false;
+
+        // Clear wheel motor and brake forces
+        if (frontLeftCollider != null)
+        {
+            frontLeftCollider.motorTorque = 0f;
+            frontLeftCollider.brakeTorque = Mathf.Infinity; // Lock wheels in place
+            frontLeftCollider.steerAngle = 0f;
+        }
+        if (frontRightCollider != null)
+        {
+            frontRightCollider.motorTorque = 0f;
+            frontRightCollider.brakeTorque = Mathf.Infinity;
+            frontRightCollider.steerAngle = 0f;
+        }
+        if (rearLeftCollider != null)
+        {
+            rearLeftCollider.motorTorque = 0f;
+            rearLeftCollider.brakeTorque = Mathf.Infinity;
+        }
+        if (rearRightCollider != null)
+        {
+            rearRightCollider.motorTorque = 0f;
+            rearRightCollider.brakeTorque = Mathf.Infinity;
+        }
+
+        // Reset Rigidbody velocities
+        if (carRigidbody != null)
+        {
+            carRigidbody.linearVelocity = Vector3.zero;
+            carRigidbody.angularVelocity = Vector3.zero;
+        }
+
+        // Stop and clear drif effects, smoke and line drift
+        if (RLWTireSkid != null)
+        {
+            RLWTireSkid.emitting = false;
+            RLWTireSkid.Clear();
+        }
+        if (RRWTireSkid != null)
+        {
+            RRWTireSkid.emitting = false;
+            RRWTireSkid.Clear();
+        }
+
+        ParticleSystem[] allParticles = GetComponentsInChildren<ParticleSystem>();
+        foreach (ParticleSystem ps in allParticles)
+        {
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+            ps.Clear(true);
+        }
+
+        // Stop drift sounds if any
+        if (tireScreechSound != null && tireScreechSound.isPlaying)
+        {
+            tireScreechSound.Stop();
+        }
+
+        // Reset wheel meshes visually
+        AnimateWheelMeshes();
     }
 }
