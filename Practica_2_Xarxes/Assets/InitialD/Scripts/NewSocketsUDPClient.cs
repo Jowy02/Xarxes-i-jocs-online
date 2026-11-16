@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using Lab7;
 using UnityEngine;
 
 public class NewSocketsUDPClient : MonoBehaviour
@@ -38,6 +40,8 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     float m_pingTimer = 0f;
     private float m_lastServerResponse;
+    private int m_lastSequence = -1;
+
 
     public static event Action<UDPPlayer.CarNetworkState> OnCarTransformReceived;
     public static event Action OnRaceRestarted;
@@ -127,6 +131,12 @@ public class NewSocketsUDPClient : MonoBehaviour
                     OnCarTransformReceived?.Invoke(state);
                 break;
 
+                case UDPPlayer.MsgType.Replication:
+                    var r = new BinaryReader(new MemoryStream(data));
+                    r.ReadByte();
+                    ReadPacket(r);
+                    break;
+
                 default:
                     Debug.Log("[SERVER] Uknown message type: " + data[0]);
                 break;
@@ -165,7 +175,33 @@ public class NewSocketsUDPClient : MonoBehaviour
     // =============================================================================================
     // PACKET HANDLING
     // =============================================================================================
+    public void ReadPacket(BinaryReader reader)              // the MsgType byte is already read
+    {
+        // --------------------------------------------------------------------------------- TODO 3 ---
+        //  Goal: read the sequence number. If it is not newer than the last one you kept, this
+        //  packet is old, ignore all of it. Otherwise remember it in m_lastSequence (slide 15).
+        //  Test scene when it works:  (h) old packet after a newer one is dropped
+        int sequence = reader.ReadInt32();
+        if (sequence <= m_lastSequence) return;              // older than what we have
+        m_lastSequence = sequence;
 
+        int count = reader.ReadInt32();
+        for (int i = 0; i < count; i++)
+        {
+            int id = reader.ReadInt32();
+            ReplicationAction action = (ReplicationAction)reader.ReadByte();
+            GameObject go = GameObject.Find("Car_" + id.ToString());              // null if this client does not know it
+            if (go == null) return;
+            if (action == ReplicationAction.Destroy)
+            {
+                if (m_racePlayerIds.Count > 0)
+                {
+                    GameObject.Destroy(go);
+                    m_racePlayerIds.Remove(id);
+                }
+            }
+        }
+    }
     void ProcessGameMessage(string message)
     {
         if (!m_running) return;

@@ -7,6 +7,8 @@ using System.Text;
 using System.Threading;
 using UnityEngine;
 using System.Globalization;
+using Lab7;
+using UnityEngine.UIElements;
 
 public class NewSocketsUDPServer : MonoBehaviour
 {
@@ -46,9 +48,19 @@ public class NewSocketsUDPServer : MonoBehaviour
     // =============================================================================================
     // START / STOP
     // =============================================================================================
-
+    public class ServerOps
+    {
+        public Action<int> markCreate, markUpdate, markDestroy;
+        public Func<byte[]> write;
+    }
+    public static ServerOps m_srv;
+    float m_nextTick;
     void Start()
     {
+        var s = new ReplicationManagerServerSolution();
+        m_srv = new ServerOps { markCreate = s.MarkCreate, markUpdate = s.MarkUpdate,
+                                markDestroy = s.MarkDestroy, write = s.WritePacket };
+
         if (Instance != this) return;
         Application.runInBackground = true;
         if (autoStart) StartNetwork();
@@ -144,13 +156,21 @@ public class NewSocketsUDPServer : MonoBehaviour
                     Log("[SERVER] Timeout: " + deadClient);
                     RemovePlayer(deadClient);
                 }
-
-
+                if (Time.time >= m_nextTick) { m_nextTick = Time.time + 0.05f; Tick(); }   // 20 per second
             }
         }
         if (m_endRaceTime > 0f && Time.time >= m_endRaceTime) EndRace();
     }
 
+    void Tick()
+    {
+        //foreach (UDPPlayer play in m_players) m_srv.markUpdate(play.id);   // everything, every tick (slide 12)
+        byte[] pack = m_srv.write();
+        foreach (EndPoint client in m_knownClients)
+        {
+            try { m_socket.SendTo(pack, client); } catch { }
+        }
+    }
     // =============================================================================================
     // MESSAGE HANDLING
     // =============================================================================================
@@ -459,8 +479,6 @@ public class NewSocketsUDPServer : MonoBehaviour
         lock (m_lastSeen) m_lastSeen.Remove(endpoint);
 
         lock (m_knownClients) m_knownClients.Remove(endpoint);
-        string carToRemove = "";
-        int playersId = -1;
         for (int i = 0; i < m_players.Count; i++)
         {
             if (m_players[i].endpoint.Equals(endpoint))
@@ -468,23 +486,22 @@ public class NewSocketsUDPServer : MonoBehaviour
                 Log("[SERVER] Player left: " + m_players[i].name);
                 if(race_start)
                 {
-                    carToRemove = "Car_" + m_players[i].id.ToString();
-                    playersId = m_players[i].id;
+                    m_srv.markDestroy(m_players[i].id);
                 }
                 m_players.RemoveAt(i);
                 break;
             }
         }
 
-        Broadcast("DISC:" + carToRemove + "," + playersId);
-        SendPlayerList();
+        //Broadcast("DISC:" + carToRemove + "," + playersId);
+        SendPlayerList();   // ESTO NO DEBERIA ESTAR AQUI
     }
     void EndRace()
     {
         m_endRaceTime = -1f;
 
         Broadcast("CHAT:===STANDINGS:");
-        for (int i = 0; i < m_standings.Count; i++)
+        for (int i = 0; i < m_standings.Count; i++) 
             Broadcast("CHAT:" + (i + 1) + ". " + m_standings[i].name);
 
         if (m_bestLapName != "")
