@@ -133,10 +133,10 @@ public class NewSocketsUDPClient : MonoBehaviour
                 //break;
 
                 case UDPPlayer.MsgType.Replication:
-                    var r = new BinaryReader(new MemoryStream(data));
-                    r.ReadByte();
-                    ReadPacket(r);
-                    break;
+                        var r = new BinaryReader(new MemoryStream(data));
+                        r.ReadByte();
+                        ReadPacket(r);
+                break;
 
                 default:
                     Debug.Log("[SERVER] Uknown message type: " + data[0]);

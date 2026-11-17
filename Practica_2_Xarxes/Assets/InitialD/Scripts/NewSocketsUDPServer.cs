@@ -194,7 +194,6 @@ public class NewSocketsUDPServer : MonoBehaviour
                 // Binary gameplay packet (30 bytes): update keep-alive and broadcast raw payload
                 lock (m_lastSeen) m_lastSeen[from] = Time.time;
                 UpdateUDPCar(data);
-                //BroadcastRaw(data, from);
             break;
 
             default:
@@ -362,9 +361,9 @@ public class NewSocketsUDPServer : MonoBehaviour
             {
                 if (play.id == objectId)
                 {
-                    play.position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
-                    play.rotation = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
-                    play.isDrifting = reader.ReadBoolean();
+                    play.carNetworkState.position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                    play.carNetworkState.rotation = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                    play.carNetworkState.isDrifting = reader.ReadBoolean();
                     break;
                 }
             }
@@ -385,7 +384,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             }
         }
     }
-
+    //BORRAR SI AL FINAL NO SE USA
     void BroadcastRaw(byte[] rawData, EndPoint sender)
     {
         lock (m_knownClients)
@@ -516,9 +515,7 @@ public class NewSocketsUDPServer : MonoBehaviour
                 break;
             }
         }
-
-        //Broadcast("DISC:" + carToRemove + "," + playersId);
-        SendPlayerList();   // ESTO NO DEBERIA ESTAR AQUI
+        SendPlayerList();   // ESTO NO SE SI DEBERIA ESTAR ASI
     }
     void EndRace()
     {
