@@ -9,6 +9,8 @@ using UnityEngine;
 using System.Globalization;
 using Lab7;
 using UnityEngine.UIElements;
+using System.IO;
+using static UnityEngine.EventSystems.EventTrigger;
 
 public class NewSocketsUDPServer : MonoBehaviour
 {
@@ -16,7 +18,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     public bool autoStart = true;
     public bool showDebugUI = true;
 
-    private List<UDPPlayer> m_players = new List<UDPPlayer>();
+    public List<UDPPlayer> m_players = new List<UDPPlayer>();
     private List<UDPPlayer> m_standings= new List<UDPPlayer>();
 
     public static NewSocketsUDPServer Instance;
@@ -57,7 +59,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     float m_nextTick;
     void Start()
     {
-        var s = new ReplicationManagerServerSolution();
+        var s = new ReplicationManagerServerSolution(Instance);
         m_srv = new ServerOps { markCreate = s.MarkCreate, markUpdate = s.MarkUpdate,
                                 markDestroy = s.MarkDestroy, write = s.WritePacket };
 
@@ -164,7 +166,7 @@ public class NewSocketsUDPServer : MonoBehaviour
 
     void Tick()
     {
-        //foreach (UDPPlayer play in m_players) m_srv.markUpdate(play.id);   // everything, every tick (slide 12)
+        if(race_start)foreach (UDPPlayer play in m_players) m_srv.markUpdate(play.id);   // everything, every tick (slide 12)
         byte[] pack = m_srv.write();
         foreach (EndPoint client in m_knownClients)
         {
@@ -191,7 +193,8 @@ public class NewSocketsUDPServer : MonoBehaviour
             case UDPPlayer.MsgType.Transform:
                 // Binary gameplay packet (30 bytes): update keep-alive and broadcast raw payload
                 lock (m_lastSeen) m_lastSeen[from] = Time.time;
-                BroadcastRaw(data, from);
+                UpdateUDPCar(data);
+                //BroadcastRaw(data, from);
             break;
 
             default:
@@ -344,6 +347,27 @@ public class NewSocketsUDPServer : MonoBehaviour
             race_start = true;
 
             return;
+        }
+    }
+
+    //Guardo posiciones en el udp player para poder añadirlas en ReplicationManager más facilmente
+    public void UpdateUDPCar(byte[] data)
+    {
+        using (MemoryStream stream = new MemoryStream(data))
+        using (BinaryReader reader = new BinaryReader(stream))
+        {
+            byte type = reader.ReadByte();
+            int objectId = reader.ReadInt32();
+            foreach (UDPPlayer play in m_players)
+            {
+                if (play.id == objectId)
+                {
+                    play.position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                    play.rotation = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                    play.isDrifting = reader.ReadBoolean();
+                    break;
+                }
+            }
         }
     }
 

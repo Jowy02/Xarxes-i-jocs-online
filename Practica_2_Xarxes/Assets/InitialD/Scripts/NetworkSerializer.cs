@@ -32,22 +32,16 @@ public static class NetworkSerializer
     // =============================================================================================
 
     // Reads the 30-byte binary payload back into a CarNetworkState structure
-    public static UDPPlayer.CarNetworkState DeserializeCar(byte[] data)
+    public static UDPPlayer.CarNetworkState DeserializeCar(BinaryReader reader,int objectID)
     {
-        using (MemoryStream stream = new MemoryStream(data))
-        using (BinaryReader reader = new BinaryReader(stream))
+        UDPPlayer.CarNetworkState state = new UDPPlayer.CarNetworkState
         {
-            byte type = reader.ReadByte();
+            objectId = objectID,
+            position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()),
+            rotation = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()),
+            isDrifting = reader.ReadBoolean()
+        };
 
-            UDPPlayer.CarNetworkState state = new UDPPlayer.CarNetworkState
-            {
-                objectId = reader.ReadInt32(),
-                position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()),
-                rotation = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()),
-                isDrifting = reader.ReadBoolean()
-            };
-
-            return state;
-        }
+        return state;        
     }
 }

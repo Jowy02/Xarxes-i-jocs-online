@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using Lab7;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public class NewSocketsUDPClient : MonoBehaviour
 {
@@ -126,10 +127,10 @@ public class NewSocketsUDPClient : MonoBehaviour
                     ProcessGameMessage(content);
                 break;
 
-                case UDPPlayer.MsgType.Transform:
-                    UDPPlayer.CarNetworkState state = NetworkSerializer.DeserializeCar(data);
-                    OnCarTransformReceived?.Invoke(state);
-                break;
+                //case UDPPlayer.MsgType.Transform:
+                //    UDPPlayer.CarNetworkState state = NetworkSerializer.DeserializeCar(data);
+                //    OnCarTransformReceived?.Invoke(state);
+                //break;
 
                 case UDPPlayer.MsgType.Replication:
                     var r = new BinaryReader(new MemoryStream(data));
@@ -191,7 +192,7 @@ public class NewSocketsUDPClient : MonoBehaviour
             int id = reader.ReadInt32();
             ReplicationAction action = (ReplicationAction)reader.ReadByte();
             GameObject go = GameObject.Find("Car_" + id.ToString());              // null if this client does not know it
-            if (go == null) return;
+            if (go == null) continue;
             if (action == ReplicationAction.Destroy)
             {
                 if (m_racePlayerIds.Count > 0)
@@ -199,6 +200,11 @@ public class NewSocketsUDPClient : MonoBehaviour
                     GameObject.Destroy(go);
                     m_racePlayerIds.Remove(id);
                 }
+            }
+            if (action == ReplicationAction.Update )
+            {
+                UDPPlayer.CarNetworkState state = NetworkSerializer.DeserializeCar(reader,id);
+                if( id != m_localPlayerId) OnCarTransformReceived?.Invoke(state);
             }
         }
     }

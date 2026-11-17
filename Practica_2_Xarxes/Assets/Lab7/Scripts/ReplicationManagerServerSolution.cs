@@ -12,13 +12,16 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 
 namespace Lab7
 {
     public class ReplicationManagerServerSolution
     {
-       // readonly Lab7LinkingContext m_linking;
+        // readonly Lab7LinkingContext m_linking;
+        public static NewSocketsUDPServer m_linking;
+
         readonly Dictionary<int, UDPPlayer.ReplicationAction> m_pending = new Dictionary<int, UDPPlayer.ReplicationAction>();
         readonly Dictionary<int, (UDPPlayer.ReplicationAction action, float until)> m_repeat = new Dictionary<int, (UDPPlayer.ReplicationAction, float)>();
         int m_sequence;
@@ -27,8 +30,7 @@ namespace Lab7
         // situations (a lost Create, a lost Destroy). In your game, leave it as it is.
         public Func<float> clock = () => Time.time;
 
-        //public ReplicationManagerServerSolution(Lab7LinkingContext linking) { m_linking = linking; }
-
+        public ReplicationManagerServerSolution(NewSocketsUDPServer linking) { m_linking = linking; }
         // ------------------------------------------------------------- given, slides 10 and 15 ---
         public void MarkCreate(int id)
         {
@@ -76,9 +78,17 @@ namespace Lab7
                 writer.Write(entry.Key);                                // 2. identify the object
                 writer.Write((byte)entry.Value);
                 if (entry.Value == UDPPlayer.ReplicationAction.Destroy) continue; // nothing else to say
+
+                foreach (UDPPlayer play in m_linking.m_players)
+                {
+                    if (play.id == entry.Key)
+                    {                             // 3. its class, which prefab
+                        play.Write(writer);
+                        break;
+                    }
+                }
                 //NetObject obj = m_linking.Find(entry.Key).GetComponent<NetObject>();
-                //writer.Write(obj.type);                                 // 3. its class, which prefab
-                //obj.Write(writer);                                      // 4. its fields
+                                   // 4. its fields
             }
             m_pending.Clear();
             return stream.ToArray();
