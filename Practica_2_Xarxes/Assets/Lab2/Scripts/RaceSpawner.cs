@@ -15,7 +15,6 @@ public class RaceSpawner : MonoBehaviour
 
     // Client and local player info
     [SerializeField] private TMPro.TMP_Text countdownText;
-    [SerializeField] private GameObject hostRestartButton;
 
     private NewSocketsUDPClient client;
     private int localPlayerId = -1;
@@ -25,6 +24,7 @@ public class RaceSpawner : MonoBehaviour
 
     // For local scripts
     public GameObject LocalCar => localCar;
+    public bool CanRestartRace => !testMode && NewSocketsUDPClient.Instance != null && NewSocketsUDPClient.Instance.isHost;
 
     // Cars
     private Dictionary<int, GameObject> cars = new Dictionary<int, GameObject>();
@@ -50,12 +50,6 @@ public class RaceSpawner : MonoBehaviour
         {
             Debug.LogError("[SPAWN] Assign the car prefab, spawn point and camera");
             return;
-        }
-
-        // Show host restart button only for the host
-        if (hostRestartButton != null)
-        {
-            hostRestartButton.SetActive(client.isHost && !testMode);
         }
 
         int[] playerIds;
