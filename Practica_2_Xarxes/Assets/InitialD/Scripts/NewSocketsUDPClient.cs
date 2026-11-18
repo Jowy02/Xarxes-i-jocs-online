@@ -6,7 +6,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using Lab7;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -19,7 +18,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     public bool showDebugUI = true;
     public bool isHost = false;
 
-    public string lobbySceneName = "Lobby";   // pon el nombre real en el Inspector
+    public string lobbySceneName = "LobbyUDP";
     public static event Action<int> OnFinishCountdown;
 
     public static NewSocketsUDPClient Instance;
@@ -47,6 +46,8 @@ public class NewSocketsUDPClient : MonoBehaviour
     public static event Action<UDPPlayer.CarNetworkState> OnCarTransformReceived;
     public static event Action OnRaceRestarted;
     public static event Action OnStartCountdownReceived;
+
+    public LinkingContext LinkingContext { get; } = new LinkingContext();
 
     // =============================================================================================
     // START / STOP
@@ -176,6 +177,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     // =============================================================================================
     // PACKET HANDLING
     // =============================================================================================
+
     public void ReadPacket(BinaryReader reader)              // the MsgType byte is already read
     {
         // --------------------------------------------------------------------------------- TODO 3 ---
@@ -190,24 +192,38 @@ public class NewSocketsUDPClient : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             int id = reader.ReadInt32();
-            ReplicationAction action = (ReplicationAction)reader.ReadByte();
-            GameObject go = GameObject.Find("Car_" + id.ToString());              // null if this client does not know it
-            if (go == null) continue;
-            if (action == ReplicationAction.Destroy)
+            UDPPlayer.ReplicationAction action = (UDPPlayer.ReplicationAction)reader.ReadByte();
+
+            GameObject go = LinkingContext.Find(id);
+
+            if (action == UDPPlayer.ReplicationAction.Destroy)
             {
-                if (m_racePlayerIds.Count > 0)
+                if (go != null)
                 {
-                    GameObject.Destroy(go);
+                    LinkingContext.Unregister(id);
+                    Destroy(go);
                     m_racePlayerIds.Remove(id);
                 }
+                continue;
             }
-            if (action == ReplicationAction.Update )
+
+            byte type = reader.ReadByte();
+
+            if (go != null)
             {
-                UDPPlayer.CarNetworkState state = NetworkSerializer.DeserializeCar(reader,id);
-                if( id != m_localPlayerId) OnCarTransformReceived?.Invoke(state);
+                UDPPlayer.CarNetworkState state = NetworkSerializer.DeserializeCar(reader, id);
+                if (id != m_localPlayerId)
+                {
+                    OnCarTransformReceived?.Invoke(state);
+                }
+            }
+            else
+            {
+                NetworkSerializer.DeserializeCar(reader, id);
             }
         }
     }
+
     void ProcessGameMessage(string message)
     {
         if (!m_running) return;

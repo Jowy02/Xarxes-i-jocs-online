@@ -100,10 +100,10 @@ public class RaceSpawner : MonoBehaviour
         {
             if (kvp.Value != null)
             {
+                if (client != null) client.LinkingContext.Unregister(kvp.Key);
                 Destroy(kvp.Value);
             }
         }
-
         cars.Clear();
         targetPositions.Clear();
         targetRotations.Clear();
@@ -151,6 +151,17 @@ public class RaceSpawner : MonoBehaviour
             cars.Add(pId, spawnedCar);
             targetPositions[pId] = spawnPoints[i].position;
             targetRotations[pId] = spawnPoints[i].rotation;
+
+            if (client != null)
+            {
+                client.LinkingContext.Register(spawnedCar, pId);
+            }
+
+            CarNetObject carNet = spawnedCar.GetComponent<CarNetObject>();
+            if (carNet != null)
+            {
+                carNet.id = pId;
+            }
 
             bool isLocalPlayer = (pId == localPlayerId);
             PrometeoCarController controller = spawnedCar.GetComponent<PrometeoCarController>();

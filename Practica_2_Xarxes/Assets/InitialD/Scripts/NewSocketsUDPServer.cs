@@ -7,7 +7,6 @@ using System.Text;
 using System.Threading;
 using UnityEngine;
 using System.Globalization;
-using Lab7;
 using UnityEngine.UIElements;
 using System.IO;
 using static UnityEngine.EventSystems.EventTrigger;
@@ -57,16 +56,23 @@ public class NewSocketsUDPServer : MonoBehaviour
     }
     public static ServerOps m_srv;
     float m_nextTick;
+
     void Start()
     {
-        var s = new ReplicationManagerServerSolution(Instance);
-        m_srv = new ServerOps { markCreate = s.MarkCreate, markUpdate = s.MarkUpdate,
-                                markDestroy = s.MarkDestroy, write = s.WritePacket };
+        var s = new ReplicationManagerServer(this);
+        m_srv = new ServerOps
+        {
+            markCreate = s.MarkCreate,
+            markUpdate = s.MarkUpdate,
+            markDestroy = s.MarkDestroy,
+            write = s.WritePacket
+        };
 
         if (Instance != this) return;
         Application.runInBackground = true;
         if (autoStart) StartNetwork();
     }
+
     public bool StartNetwork()
     {
         if (m_running) return true;

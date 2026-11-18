@@ -47,6 +47,7 @@ GameObject:
   - component: {fileID: 5135156708204615449}
   - component: {fileID: 627556911}
   - component: {fileID: 3169441285098278687}
+  - component: {fileID: 4569208207225241205}
   m_Layer: 0
   m_Name: Prometheus
   m_TagString: Car_
@@ -160,6 +161,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LapManager
   totalLaps: 3
+--- !u!114 &4569208207225241205
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 642287924342879162}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ae69cc8976890fa49af5fe878f255b3b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CarNetObject
+  id: 0
+  type: 0
+  networkRotation: {x: 0, y: 0, z: 0}
+  isDrifting: 0
 --- !u!1 &934883528070179459
 GameObject:
   m_ObjectHideFlags: 0
