@@ -16,7 +16,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     public bool showDebugUI = true;
     public bool isHost = false;
 
-    public string lobbySceneName = "Lobby";   // pon el nombre real en el Inspector
+    public string lobbySceneName = "Lobby";
     public static event Action<int> OnFinishCountdown;
 
     public static NewSocketsUDPClient Instance;

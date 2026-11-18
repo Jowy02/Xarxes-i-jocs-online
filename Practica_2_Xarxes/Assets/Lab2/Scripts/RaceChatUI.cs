@@ -13,7 +13,7 @@ public class RaceChatUI : MonoBehaviour
     {
         client = FindFirstObjectByType<NewSocketsUDPClient>();
         chatPanel.SetActive(false);
-        chatInput.onSubmit.AddListener(_ => SendChatMessage()); // Enter envía
+        chatInput.onSubmit.AddListener(_ => SendChatMessage());
     }
 
     void Update()

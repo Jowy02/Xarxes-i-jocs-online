@@ -38,8 +38,13 @@ public class RaceSpawner : MonoBehaviour
 
     void Start()
     {
-
         client = FindFirstObjectByType<NewSocketsUDPClient>();
+
+        // Hide countdown in test mode
+        if (testMode && countdownText != null)
+        {
+            countdownText.gameObject.SetActive(false);
+        }
 
         if (client == null || carPrefab == null || cameraFollow == null)
         {
