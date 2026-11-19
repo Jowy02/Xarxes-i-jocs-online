@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -15,7 +16,7 @@ public class InRaceMenuUI : MonoBehaviour
     private Vector2 closedPosition;
     private bool isOpen = false;
 
-    void Start()
+    IEnumerator Start()
     {
         raceSpawner = FindFirstObjectByType<RaceSpawner>();
 
@@ -23,7 +24,7 @@ public class InRaceMenuUI : MonoBehaviour
         {
             Debug.LogError("[RACE MENU] Menu panel is not assigned.");
             enabled = false;
-            return;
+            yield break;
         }
 
         Canvas.ForceUpdateCanvases();
@@ -32,6 +33,8 @@ public class InRaceMenuUI : MonoBehaviour
         closedPosition = openPosition + Vector2.right * menuPanel.rect.width;
 
         menuPanel.anchoredPosition = closedPosition;
+
+        yield return null;
 
         if (restartRaceButton != null)
         {
@@ -64,7 +67,11 @@ public class InRaceMenuUI : MonoBehaviour
 
         Vector2 targetPosition = isOpen ? openPosition : closedPosition;
 
-        menuPanel.anchoredPosition = Vector2.Lerp(menuPanel.anchoredPosition, targetPosition, 1f - Mathf.Exp(-animationSpeed * Time.unscaledDeltaTime));
+        menuPanel.anchoredPosition = Vector2.Lerp(
+            menuPanel.anchoredPosition,
+            targetPosition,
+            1f - Mathf.Exp(-animationSpeed * Time.unscaledDeltaTime)
+        );
     }
 
     private void RestartRace()

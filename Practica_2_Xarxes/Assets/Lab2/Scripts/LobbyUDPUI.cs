@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
+using UnityEngine.SceneManagement;
 
 public class LobbyUDPUI : MonoBehaviour
 {
@@ -17,6 +18,9 @@ public class LobbyUDPUI : MonoBehaviour
     [SerializeField] private GameObject lobbyPanel;
     [SerializeField] private GameObject startRaceButton;
 
+    [Header("Scene Navigation")]
+    [SerializeField] private string mainMenuSceneName = "MainMenu";
+
     // =============================================================================================
     // CHAT
     // =============================================================================================
@@ -31,7 +35,9 @@ public class LobbyUDPUI : MonoBehaviour
     {
         client = NewSocketsUDPClient.Instance;
         server = NewSocketsUDPServer.Instance;
+
         bool connected = client.IsRunning();
+
         lobbyPanel.SetActive(!connected);
         toggleLobbyButton.SetActive(connected);
         toggleChatButton.SetActive(connected);
@@ -42,19 +48,23 @@ public class LobbyUDPUI : MonoBehaviour
     {
         lobbyPanel.SetActive(!lobbyPanel.activeSelf);
     }
+
     public void ToggleChat()
     {
         chatPanel.SetActive(!chatPanel.activeSelf);
     }
+
     public void SendChatMessage()
-    { 
+    {
         string message = chatInput.text.Trim();
         client.SendString("CHAT:" + client.userName + ": " + message);
     }
+
     public void JoinGame()
     {
         if (client.IsRunning())
             return;
+
         toggleChatButton.SetActive(true);
 
         string playerName = nameInput.text.Trim();
@@ -67,6 +77,7 @@ public class LobbyUDPUI : MonoBehaviour
         }
 
         IPAddress address;
+
         if (!IPAddress.TryParse(ip, out address) ||
             address.AddressFamily != AddressFamily.InterNetwork)
         {
@@ -77,7 +88,9 @@ public class LobbyUDPUI : MonoBehaviour
         client.isHost = false;
         client.userName = playerName;
         client.serverIp = address.ToString();
+
         client.StartNetwork();
+
         lobbyPanel.SetActive(false);
         toggleLobbyButton.SetActive(true);
     }
@@ -120,7 +133,9 @@ public class LobbyUDPUI : MonoBehaviour
 
     public void HostGame()
     {
-        if (client.IsRunning()) return;
+        if (client.IsRunning())
+            return;
+
         toggleChatButton.SetActive(true);
 
         string playerName = nameInput.text.Trim();
@@ -131,7 +146,8 @@ public class LobbyUDPUI : MonoBehaviour
             return;
         }
 
-        if (!server.StartNetwork()) return;
+        if (!server.StartNetwork())
+            return;
 
         client.isHost = true;
         client.userName = playerName;
@@ -139,7 +155,9 @@ public class LobbyUDPUI : MonoBehaviour
         client.port = server.port;
 
         ipInput.text = "127.0.0.1";
+
         client.StartNetwork();
+
         lobbyPanel.SetActive(false);
         toggleLobbyButton.SetActive(true);
     }
@@ -150,11 +168,30 @@ public class LobbyUDPUI : MonoBehaviour
         chatPanel.SetActive(false);
 
         client.isHost = false;
+
         client.Disconnect();
         server.Disconnect();
+
         lobbyPanel.SetActive(true);
         toggleLobbyButton.SetActive(false);
     }
+
+    // =============================================================================================
+    // SCENE NAVIGATION
+    // =============================================================================================
+
+    public void ReturnToMainMenu()
+    {
+        Debug.Log("[LOBBY] Returning to Main Menu...");
+
+        LeaveGame();
+
+        SceneManager.LoadScene(mainMenuSceneName);
+    }
+
+    // =============================================================================================
+    // RACE
+    // =============================================================================================
 
     public void OnClickStartRace()
     {

@@ -36,35 +36,36 @@ public class RaceSpawner : MonoBehaviour
     private float sendTimer = 0f;
     private bool raceStarted = false;
 
+
     void Start()
     {
+        testMode = testMode || MainMenuUI.StartInTestMode;
+        MainMenuUI.StartInTestMode = false;
+
         client = FindFirstObjectByType<NewSocketsUDPClient>();
 
-        // Hide countdown in test mode
         if (testMode && countdownText != null)
         {
             countdownText.gameObject.SetActive(false);
         }
 
-        if (client == null || carPrefab == null || cameraFollow == null)
+        if ((!testMode && client == null) || carPrefab == null || cameraFollow == null)
         {
             Debug.LogError("[SPAWN] Assign the car prefab, spawn point and camera");
             return;
         }
 
         int[] playerIds;
-        localPlayerId = client.GetLocalPlayerId();
+        localPlayerId = client != null ? client.GetLocalPlayerId() : -1;
 
         if (testMode)
         {
-            // Generate test player IDs
             if (localPlayerId < 0)
             {
                 localPlayerId = 0;
             }
 
             playerIds = CreateTestPlayerIds();
-
             Debug.Log("[SPAWN] TEST MODE: Spawning " + playerIds.Length + " cars");
         }
         else
@@ -72,7 +73,6 @@ public class RaceSpawner : MonoBehaviour
             playerIds = client.GetRacePlayerIds();
         }
 
-        // Check if we have enough spawn points
         if (spawnPoints == null || spawnPoints.Length < playerIds.Length)
         {
             Debug.LogError("[SPAWN] Not enough spawn points");
@@ -81,8 +81,7 @@ public class RaceSpawner : MonoBehaviour
 
         SpawnCars(playerIds);
 
-        // Tell the server we are ready for the starting countdown (host triggers it)
-        if (client.isHost && !testMode)
+        if (!testMode && client != null && client.isHost)
         {
             StartCoroutine(TriggerServerCountdownDelay());
         }
