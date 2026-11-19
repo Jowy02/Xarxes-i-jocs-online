@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -16,7 +17,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     public bool showDebugUI = true;
     public bool isHost = false;
 
-    public string lobbySceneName = "Lobby";
+    public string lobbySceneName = "LobbyUDP";
     public static event Action<int> OnFinishCountdown;
 
     public static NewSocketsUDPClient Instance;
@@ -42,6 +43,9 @@ public class NewSocketsUDPClient : MonoBehaviour
     public static event Action<UDPPlayer.CarNetworkState> OnCarTransformReceived;
     public static event Action OnRaceRestarted;
     public static event Action OnStartCountdownReceived;
+
+    public LinkingContext LinkingContext { get; } = new LinkingContext();
+    private int m_lastSequence = -1;
 
     // =============================================================================================
     // START / STOP
@@ -122,9 +126,15 @@ public class NewSocketsUDPClient : MonoBehaviour
                     ProcessGameMessage(content);
                 break;
 
-                case UDPPlayer.MsgType.Transform:
-                    UDPPlayer.CarNetworkState state = NetworkSerializer.DeserializeCar(data);
-                    OnCarTransformReceived?.Invoke(state);
+                //case UDPPlayer.MsgType.Transform:
+                //    UDPPlayer.CarNetworkState state = NetworkSerializer.DeserializeCar(data);
+                //    OnCarTransformReceived?.Invoke(state);
+                //break;
+
+                case UDPPlayer.MsgType.Replication:
+                    var r = new BinaryReader(new MemoryStream(data));
+                    r.ReadByte();
+                    ReadPacket(r);
                 break;
 
                 default:
@@ -166,6 +176,66 @@ public class NewSocketsUDPClient : MonoBehaviour
     // PACKET HANDLING
     // =============================================================================================
 
+    public void ReadPacket(BinaryReader reader)
+    {
+        int sequence = reader.ReadInt32();
+        if (sequence <= m_lastSequence) return;
+        m_lastSequence = sequence;
+
+        int count = reader.ReadInt32();
+        for (int i = 0; i < count; i++)
+        {
+            int id = reader.ReadInt32();
+            UDPPlayer.ReplicationAction action = (UDPPlayer.ReplicationAction)reader.ReadByte();
+
+            GameObject go = LinkingContext.Find(id);
+
+            if (action == UDPPlayer.ReplicationAction.Destroy)
+            {
+                if (go != null)
+                {
+                    LinkingContext.Unregister(id);
+                    Destroy(go);
+                    m_racePlayerIds.Remove(id);
+                }
+                continue;
+            }
+
+            byte type = reader.ReadByte(); // type 0 = Car
+
+            if (go == null)
+            {
+                // If the object exists, instanciate
+                continue;
+            }
+
+            // Call to Read of NetObject (CarNetObject)
+            NetObject netObj = go.GetComponent<NetObject>();
+            if (netObj != null)
+            {
+                netObj.Read(reader); // Read own position, rotation, drift and skin
+
+                // If its not local car, trigger the event to apply visual lerp
+                if (id != m_localPlayerId)
+                {
+                    CarNetObject carNet = go.GetComponent<CarNetObject>();
+                    if (carNet != null)
+                    {
+                        UDPPlayer.CarNetworkState state = new UDPPlayer.CarNetworkState
+                        {
+                            objectId = id,
+                            position = go.transform.position,
+                            rotation = go.transform.eulerAngles,
+                            isDrifting = carNet.isDrifting,
+                            skinId = carNet.skinId
+                        };
+                        OnCarTransformReceived?.Invoke(state);
+                    }
+                }
+            }
+        }
+    }
+
     void ProcessGameMessage(string message)
     {
         if (!m_running) return;
@@ -188,7 +258,6 @@ public class NewSocketsUDPClient : MonoBehaviour
             return;
         }
 
-        // PLAYERS:name1,name2,... -> replaces the local list with the one sent by the server
         if (message.StartsWith("PLAYERS:"))
         {
             string names = message.Substring(8);
@@ -297,12 +366,11 @@ public class NewSocketsUDPClient : MonoBehaviour
         Send(UDPPlayer.MsgType.Text, text);
     }
 
-    public void SendCarTransform(int id, Vector3 pos, Vector3 rot, bool isDrifting)
+    public void SendCarTransform(int id, Vector3 pos, Vector3 rot, bool isDrifting, int skinId)
     {
         if (m_socket == null || m_serverEndPoint == null || !m_running) return;
 
-        byte[] payload = NetworkSerializer.SerializeCar(id, pos, rot, isDrifting);
-
+        byte[] payload = NetworkSerializer.SerializeCar(id, pos, rot, isDrifting, skinId);
         try
         {
             m_socket.SendTo(payload, m_serverEndPoint);

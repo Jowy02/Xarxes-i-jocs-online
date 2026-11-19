@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using UnityEngine;
-using System.Globalization;
 
 public class NewSocketsUDPServer : MonoBehaviour
 {
@@ -14,8 +15,8 @@ public class NewSocketsUDPServer : MonoBehaviour
     public bool autoStart = true;
     public bool showDebugUI = true;
 
-    private List<UDPPlayer> m_players = new List<UDPPlayer>();
-    private List<UDPPlayer> m_standings= new List<UDPPlayer>();
+    public List<UDPPlayer> m_players = new List<UDPPlayer>();
+    public List<UDPPlayer> m_standings= new List<UDPPlayer>();
 
     public static NewSocketsUDPServer Instance;
 
@@ -47,8 +48,25 @@ public class NewSocketsUDPServer : MonoBehaviour
     // START / STOP
     // =============================================================================================
 
+    public class ServerOps
+    {
+        public Action<int> markCreate, markUpdate, markDestroy;
+        public Func<byte[]> write;
+    }
+    public static ServerOps m_srv;
+    float m_nextTick;
+
     void Start()
     {
+        var s = new ReplicationManagerServer(this);
+        m_srv = new ServerOps
+        {
+            markCreate = s.MarkCreate,
+            markUpdate = s.MarkUpdate,
+            markDestroy = s.MarkDestroy,
+            write = s.WritePacket
+        };
+
         if (Instance != this) return;
         Application.runInBackground = true;
         if (autoStart) StartNetwork();
@@ -144,11 +162,24 @@ public class NewSocketsUDPServer : MonoBehaviour
                     Log("[SERVER] Timeout: " + deadClient);
                     RemovePlayer(deadClient);
                 }
-
+                if (Time.time >= m_nextTick) { m_nextTick = Time.time + 0.05f; Tick(); }
 
             }
         }
         if (m_endRaceTime > 0f && Time.time >= m_endRaceTime) EndRace();
+    }
+
+    void Tick()
+    {
+        if (race_start)
+        {
+            foreach (UDPPlayer play in m_players) m_srv.markUpdate(play.id);
+        }
+        byte[] pack = m_srv.write();
+        foreach (EndPoint client in m_knownClients)
+        {
+            try { m_socket.SendTo(pack, client); } catch { }
+        }
     }
 
     // =============================================================================================
@@ -169,10 +200,9 @@ public class NewSocketsUDPServer : MonoBehaviour
             break;
 
             case UDPPlayer.MsgType.Transform:
-                // Binary gameplay packet (30 bytes): update keep-alive and broadcast raw payload
                 lock (m_lastSeen) m_lastSeen[from] = Time.time;
-                BroadcastRaw(data, from);
-            break;
+                UpdateUDPCar(data);
+                break;
 
             default:
                 Log("[SERVER] Uknown message type: " + data[0]);
@@ -265,7 +295,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             {
                 if (m_players[i].endpoint.Equals(from))
                 {
-                    m_standings.Add(m_players[i]); // To make a table on the future
+                    m_standings.Add(m_players[i]);
                     if (m_standings.Count <= 1)
                     {
                         Broadcast("CHAT:" + m_players[i].name + " WINS THE RACE");
@@ -324,6 +354,27 @@ public class NewSocketsUDPServer : MonoBehaviour
             race_start = true;
 
             return;
+        }
+    }
+
+    public void UpdateUDPCar(byte[] data)
+    {
+        using (MemoryStream stream = new MemoryStream(data))
+        using (BinaryReader reader = new BinaryReader(stream))
+        {
+            byte type = reader.ReadByte();
+            int objectId = reader.ReadInt32();
+            foreach (UDPPlayer play in m_players)
+            {
+                if (play.id == objectId)
+                {
+                    play.carNetworkState.position = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                    play.carNetworkState.rotation = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+                    play.carNetworkState.isDrifting = reader.ReadBoolean();
+                    play.carNetworkState.skinId = reader.ReadInt32();
+                    break;
+                }
+            }
         }
     }
 
@@ -468,8 +519,7 @@ public class NewSocketsUDPServer : MonoBehaviour
                 Log("[SERVER] Player left: " + m_players[i].name);
                 if(race_start)
                 {
-                    carToRemove = "Car_" + m_players[i].id.ToString();
-                    playersId = m_players[i].id;
+                    m_srv.markDestroy(m_players[i].id);
                 }
                 m_players.RemoveAt(i);
                 break;

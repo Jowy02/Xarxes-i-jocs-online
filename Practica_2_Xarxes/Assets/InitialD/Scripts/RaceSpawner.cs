@@ -22,7 +22,7 @@ public class RaceSpawner : MonoBehaviour
     private GameObject localCar;
     private PrometeoCarController localController;
 
-    // For local scripts
+    // For local scripts & UI
     public GameObject LocalCar => localCar;
     public bool CanRestartRace => !testMode && NewSocketsUDPClient.Instance != null && NewSocketsUDPClient.Instance.isHost;
 
@@ -36,13 +36,12 @@ public class RaceSpawner : MonoBehaviour
     private float sendTimer = 0f;
     private bool raceStarted = false;
 
-
     void Start()
     {
         testMode = testMode || MainMenuUI.StartInTestMode;
         MainMenuUI.StartInTestMode = false;
 
-        client = FindFirstObjectByType<NewSocketsUDPClient>();
+        client = NewSocketsUDPClient.Instance ?? FindFirstObjectByType<NewSocketsUDPClient>();
 
         if (testMode && countdownText != null)
         {
@@ -87,7 +86,6 @@ public class RaceSpawner : MonoBehaviour
         }
     }
 
-    // Generate test player IDs
     int[] CreateTestPlayerIds()
     {
         int count = Mathf.Clamp(testCarCount, 1, 12);
@@ -98,7 +96,6 @@ public class RaceSpawner : MonoBehaviour
             testIds[i] = i;
         }
 
-        // Preserve the local player's ID
         if (localPlayerId >= 0)
         {
             int localSkinIndex = localPlayerId % count;
@@ -110,7 +107,7 @@ public class RaceSpawner : MonoBehaviour
 
     IEnumerator TriggerServerCountdownDelay()
     {
-        yield return new WaitForSeconds(0.5f); // Short buffer to ensure all scenes are loaded
+        yield return new WaitForSeconds(0.5f);
         if (client != null && client.IsRunning())
         {
             client.SendString("READY_FOR_COUNTDOWN:");
@@ -135,11 +132,14 @@ public class RaceSpawner : MonoBehaviour
 
     void OnDestroy()
     {
-        // Clean up all instantiated cars from the scene
         foreach (KeyValuePair<int, GameObject> kvp in cars)
         {
             if (kvp.Value != null)
             {
+                if (client != null && client.LinkingContext != null)
+                {
+                    client.LinkingContext.Unregister(kvp.Key);
+                }
                 Destroy(kvp.Value);
             }
         }
@@ -159,7 +159,6 @@ public class RaceSpawner : MonoBehaviour
         SmoothRemoteCars();
     }
 
-    // Smooth remote cars to remove 20Hz network jitter
     void SmoothRemoteCars()
     {
         foreach (KeyValuePair<int, GameObject> entry in cars)
@@ -182,7 +181,6 @@ public class RaceSpawner : MonoBehaviour
         }
     }
 
-    // Car creation
     void SpawnCars(int[] playerIds)
     {
         for (int i = 0; i < playerIds.Length; i++)
@@ -190,16 +188,22 @@ public class RaceSpawner : MonoBehaviour
             int pId = playerIds[i];
             GameObject spawnedCar = Instantiate(carPrefab, spawnPoints[i].position, spawnPoints[i].rotation);
 
-            // Apply player skin based on ID
-            PrometeoSkinManager skinManager = spawnedCar.GetComponent<PrometeoSkinManager>();
+            if (client != null && client.LinkingContext != null)
+            {
+                client.LinkingContext.Register(spawnedCar, pId);
+            }
 
+            CarNetObject carNet = spawnedCar.GetComponent<CarNetObject>();
+            if (carNet != null)
+            {
+                carNet.id = pId;
+                carNet.skinId = pId;
+            }
+
+            PrometeoSkinManager skinManager = spawnedCar.GetComponent<PrometeoSkinManager>();
             if (skinManager != null)
             {
                 skinManager.ApplySkin(pId);
-            }
-            else
-            {
-                Debug.LogWarning("[SPAWN] PrometeoSkinManager not found on car prefab");
             }
 
             spawnedCar.name = "Car_" + pId;
@@ -217,13 +221,10 @@ public class RaceSpawner : MonoBehaviour
                 return;
             }
 
-            // Only enable for the local player
             if (isLocalPlayer)
             {
                 localCar = spawnedCar;
                 localController = controller;
-
-                // Enable immediately in test mode
                 localController.enabled = testMode;
 
                 cameraFollow.target = spawnedCar.transform;
@@ -237,7 +238,6 @@ public class RaceSpawner : MonoBehaviour
         }
     }
 
-    // 5-second countdown timer
     void HandleStartCountdown()
     {
         if (testMode) return;
@@ -336,7 +336,6 @@ public class RaceSpawner : MonoBehaviour
             localController.enabled = false;
         }
 
-        // Reposition all cars to the starting grid
         int[] playerIds = client.GetRacePlayerIds();
 
         for (int i = 0; i < playerIds.Length; i++)
@@ -357,9 +356,13 @@ public class RaceSpawner : MonoBehaviour
                 }
             }
         }
+
         if (localCar != null && client != null && client.IsRunning())
         {
-            client.SendCarTransform(localPlayerId, localCar.transform.position, localCar.transform.eulerAngles, false);
+            CarNetObject carNet = localCar.GetComponent<CarNetObject>();
+            int currentSkin = carNet != null ? carNet.skinId : localPlayerId;
+
+            client.SendCarTransform(localPlayerId, localCar.transform.position, localCar.transform.eulerAngles, false, currentSkin);
         }
     }
 
@@ -369,11 +372,14 @@ public class RaceSpawner : MonoBehaviour
         if (localCar == null || localController == null) return;
 
         sendTimer += Time.deltaTime;
-
-        if (sendTimer >= 0.05f) // 20 times per second
+        if (sendTimer >= 0.05f)
         {
             sendTimer = 0.0f;
-            client.SendCarTransform(localPlayerId, localCar.transform.position, localCar.transform.eulerAngles, localController.isDrifting);
+
+            CarNetObject carNet = localCar.GetComponent<CarNetObject>();
+            int currentSkin = carNet != null ? carNet.skinId : localPlayerId;
+
+            client.SendCarTransform(localPlayerId, localCar.transform.position, localCar.transform.eulerAngles, localController.isDrifting, currentSkin);
         }
     }
 
@@ -389,6 +395,7 @@ public class RaceSpawner : MonoBehaviour
         {
             PrometeoCarController remoteController = remoteCar.GetComponent<PrometeoCarController>();
             float distance = Vector3.Distance(remoteCar.transform.position, state.position);
+
             if (distance > 8f)
             {
                 remoteCar.transform.position = state.position;
@@ -405,6 +412,18 @@ public class RaceSpawner : MonoBehaviour
 
             targetPositions[state.objectId] = state.position;
             targetRotations[state.objectId] = Quaternion.Euler(state.rotation);
+
+            // Sync skin cars remote
+            CarNetObject carNet = remoteCar.GetComponent<CarNetObject>();
+            if (carNet != null && carNet.skinId != state.skinId)
+            {
+                carNet.skinId = state.skinId;
+                PrometeoSkinManager skinManager = remoteCar.GetComponent<PrometeoSkinManager>();
+                if (skinManager != null)
+                {
+                    skinManager.ApplySkin(state.skinId);
+                }
+            }
 
             if (remoteController != null && remoteController.useEffects)
             {
@@ -431,7 +450,6 @@ public class RaceSpawner : MonoBehaviour
     void ShowFinishCountdown(int secs)
     {
         if (testMode) return;
-
         StartCoroutine(FinishCountdownRoutine(secs));
     }
 

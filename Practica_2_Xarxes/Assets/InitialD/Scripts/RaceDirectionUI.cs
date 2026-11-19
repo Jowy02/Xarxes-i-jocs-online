@@ -26,7 +26,7 @@ public class RaceDirectionUI : MonoBehaviour
 
     private Coroutine hideCoroutine;
 
-    //Hides the direction arrow when the UI is initialized
+    // Hides the direction arrow when the UI is initialized
     private void Awake()
     {
         if (arrowImage != null)
@@ -35,7 +35,7 @@ public class RaceDirectionUI : MonoBehaviour
         }
     }
 
-    //Displays the selected direction and restarts the hide timer
+    // Displays the selected direction and restarts the hide timer
     public void ShowDirection(Direction direction)
     {
         ShowDirection(direction, defaultDuration);
@@ -68,7 +68,7 @@ public class RaceDirectionUI : MonoBehaviour
         hideCoroutine = StartCoroutine(HideAfterDelay(duration));
     }
 
-    //Immediately hides the arrow and cancels any active hide timer
+    // Immediately hides the arrow and cancels any active hide timer
     public void HideDirection()
     {
         if (hideCoroutine != null)
@@ -104,7 +104,7 @@ public class RaceDirectionUI : MonoBehaviour
         }
     }
 
-    //Waits for the specified duration before hiding the arrow automatically
+    // Waits for the specified duration before hiding the arrow automatically
     private IEnumerator HideAfterDelay(float duration)
     {
         yield return new WaitForSeconds(
