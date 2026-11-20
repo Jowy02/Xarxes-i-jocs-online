@@ -1,9 +1,11 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 
 public class RaceChatUI : MonoBehaviour
 {
     [SerializeField] private TMPro.TMP_Text chatLog;
+    [SerializeField] private ScrollRect chatScroll;
     [SerializeField] private TMPro.TMP_InputField chatInput;
     [SerializeField] private GameObject chatPanel;
 
@@ -19,7 +21,31 @@ public class RaceChatUI : MonoBehaviour
     void Update()
     {
         if (client == null) return;
-        chatLog.text = "Chat:\n" + client.GetChatLog();
+        UpdateChatLog();
+    }
+
+    // Refreshes the chat text and keeps the view at the bottom, unless the player has scrolled up
+    void UpdateChatLog()
+    {
+        string text = "Chat:\n" + client.GetChatLog();
+        if (chatLog.text == text) return;
+
+        bool atBottom = true;
+
+        if (chatScroll != null)
+        {
+            RectTransform viewport = chatScroll.viewport != null ? chatScroll.viewport : (RectTransform)chatScroll.transform;
+            atBottom = chatScroll.content.rect.height <= viewport.rect.height + 1f
+                       || chatScroll.verticalNormalizedPosition <= 0.01f;
+        }
+
+        chatLog.text = text;
+
+        if (chatScroll != null && atBottom)
+        {
+            Canvas.ForceUpdateCanvases();
+            chatScroll.verticalNormalizedPosition = 0f;
+        }
     }
 
     public void ToggleChat()

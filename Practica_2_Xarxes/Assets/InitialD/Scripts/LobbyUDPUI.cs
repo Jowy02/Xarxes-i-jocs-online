@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class LobbyUDPUI : MonoBehaviour
 {
@@ -28,6 +29,7 @@ public class LobbyUDPUI : MonoBehaviour
     [SerializeField] private GameObject toggleLobbyButton;
     [SerializeField] private GameObject toggleChatButton;
     [SerializeField] private TMPro.TMP_Text chatLog;
+    [SerializeField] private ScrollRect chatScroll;
     [SerializeField] private TMPro.TMP_InputField chatInput;
     [SerializeField] private GameObject chatPanel;
 
@@ -119,7 +121,7 @@ public class LobbyUDPUI : MonoBehaviour
         }
 
         playersText.text = "Players:\n" + client.GetPlayerNames();
-        chatLog.text = "Chat:\n" + client.GetChatLog();
+        UpdateChatLog();
 
         if (client.isHost && client.IsRunning())
         {
@@ -128,6 +130,30 @@ public class LobbyUDPUI : MonoBehaviour
         else
         {
             startRaceButton.SetActive(false);
+        }
+    }
+
+    // Refreshes the chat text and keeps the view at the bottom, unless the player has scrolled up
+    void UpdateChatLog()
+    {
+        string text = "Chat:\n" + client.GetChatLog();
+        if (chatLog.text == text) return;
+
+        bool atBottom = true;
+
+        if (chatScroll != null)
+        {
+            RectTransform viewport = chatScroll.viewport != null ? chatScroll.viewport : (RectTransform)chatScroll.transform;
+            atBottom = chatScroll.content.rect.height <= viewport.rect.height + 1f
+                       || chatScroll.verticalNormalizedPosition <= 0.01f;
+        }
+
+        chatLog.text = text;
+
+        if (chatScroll != null && atBottom)
+        {
+            Canvas.ForceUpdateCanvases();
+            chatScroll.verticalNormalizedPosition = 0f;
         }
     }
 
