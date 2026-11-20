@@ -49,16 +49,20 @@ public class ReplicationManagerServer
         // Header: MsgType 1b + Sequence 4b + Count 4b = 9 bytes
         writer.Write((byte)UDPPlayer.MsgType.Replication);
         writer.Write(m_sequence++);
-        writer.Write(m_pending.Count);
+        long countPosition = stream.Position;
+        writer.Write(0);
+        int count = 0;
 
         // Body
         foreach (KeyValuePair<int, UDPPlayer.ReplicationAction> entry in m_pending)
         {
-            writer.Write(entry.Key);         // ID 4b
-            writer.Write((byte)entry.Value); // Action 1b
-
             if (entry.Value == UDPPlayer.ReplicationAction.Destroy)
+            {
+                writer.Write(entry.Key);         // ID 4b
+                writer.Write((byte)entry.Value); // Action 1b
+                count++;
                 continue;
+            }
 
             UDPPlayer targetPlayer = null;
             for (int i = 0; i < m_server.m_players.Count; i++)
@@ -72,10 +76,27 @@ public class ReplicationManagerServer
 
             if (targetPlayer != null)
             {
-                writer.Write((byte)0); // Type 0 = Car
+                writer.Write(entry.Key);
+                writer.Write((byte)entry.Value);
+                writer.Write((byte)UDPPlayer.ObjectType.Car); // Type 0 = Car
                 targetPlayer.Write(writer);
+                count++;
+                continue;
+            }
+
+            BoostPickupState targetPickup = m_server.FindPickup(entry.Key);
+            if (targetPickup != null)
+            {
+                writer.Write(entry.Key);
+                writer.Write((byte)entry.Value);
+                writer.Write((byte)UDPPlayer.ObjectType.BoostPickup); // Type 1 = Boost
+                targetPickup.Write(writer);
+                count++;
             }
         }
+
+        stream.Position = countPosition;
+        writer.Write(count);
 
         m_pending.Clear();
         return stream.ToArray();

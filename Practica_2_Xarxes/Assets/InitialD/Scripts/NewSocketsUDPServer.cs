@@ -46,10 +46,6 @@ public class NewSocketsUDPServer : MonoBehaviour
     private float m_endRaceTime = -1f;
     private string m_bestLapName = "";
     private float m_bestLapTime = float.MaxValue;
-    // =============================================================================================
-    // START / STOP
-    // =============================================================================================
-
     public class ServerOps
     {
         public Action<int> markCreate, markUpdate, markDestroy;
@@ -57,6 +53,15 @@ public class NewSocketsUDPServer : MonoBehaviour
     }
     public static ServerOps m_srv;
     float m_nextTick;
+
+    public BoostPickupState FindPickup(int id)
+    {
+        return null;
+    }
+
+    // =============================================================================================
+    // START / STOP
+    // =============================================================================================
 
     void Start()
     {

@@ -42,4 +42,5 @@ public class UDPPlayer
     [Serializable]
     public enum MsgType : byte { Text = 1, Transform = 2, Replication = 5 }
     public enum ReplicationAction : byte { Create = 1, Update = 2, Destroy = 3 }
+    public enum ObjectType : byte { Car = 0, BoostPickup = 1 }
 }
