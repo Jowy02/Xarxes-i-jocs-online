@@ -20,6 +20,8 @@ public class NewSocketsUDPServer : MonoBehaviour
 
     public static NewSocketsUDPServer Instance;
 
+    NetSim m_sim;
+
     private int m_nextPlayerId = 0;
 
     const int MaxPacketSize = 64 * 1024;
@@ -79,6 +81,7 @@ public class NewSocketsUDPServer : MonoBehaviour
         {
             m_socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
             m_socket.Bind(new IPEndPoint(IPAddress.Any, port));
+            m_sim.m_socket = m_socket;
         }
         catch (SocketException error)
         {
@@ -126,6 +129,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     {
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
+        m_sim = gameObject.AddComponent<NetSim>();
         DontDestroyOnLoad(gameObject);
     }
 
@@ -178,7 +182,7 @@ public class NewSocketsUDPServer : MonoBehaviour
         byte[] pack = m_srv.write();
         foreach (EndPoint client in m_knownClients)
         {
-            try { m_socket.SendTo(pack, client); } catch { }
+            try { m_sim.Send(pack, client); ; } catch { }
         }
     }
 
@@ -401,7 +405,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             {
                 if (m_socket != null && !client.Equals(sender))
                 {
-                    try { m_socket.SendTo(rawData, client); } catch { }
+                    try { m_sim.Send(rawData, client); } catch { }
                 }
             }
         }
@@ -417,7 +421,7 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         try
         {
-            m_socket.SendTo(payload, client);
+            m_sim.Send(payload, client);
         }
         catch { }
     }

@@ -47,6 +47,8 @@ public class NewSocketsUDPClient : MonoBehaviour
     public LinkingContext LinkingContext { get; } = new LinkingContext();
     private int m_lastSequence = -1;
 
+    NetSim m_sim; 
+
     // =============================================================================================
     // START / STOP
     // =============================================================================================
@@ -55,6 +57,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     {
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
+        m_sim = gameObject.AddComponent<NetSim>();
         DontDestroyOnLoad(gameObject);
     }
 
@@ -85,7 +88,7 @@ public class NewSocketsUDPClient : MonoBehaviour
         if (!m_running) return;
 
         // By sending Leave here before closing the socket, we can skip the wainting timeout
-        SendString("LEAVE:");
+        SendDirect("LEAVE:");
         m_running = false;
 
         if (m_socket != null)
@@ -203,9 +206,9 @@ public class NewSocketsUDPClient : MonoBehaviour
 
             byte type = reader.ReadByte(); // type 0 = Car
 
-            if (go == null)
+            if (id == m_localPlayerId)
             {
-                // If the object exists, instanciate
+                reader.ReadBytes(29); // skip its data: 6 floats + bool + int
                 continue;
             }
 
@@ -373,7 +376,7 @@ public class NewSocketsUDPClient : MonoBehaviour
         byte[] payload = NetworkSerializer.SerializeCar(id, pos, rot, isDrifting, skinId);
         try
         {
-            m_socket.SendTo(payload, m_serverEndPoint);
+            m_sim.Send(payload, m_serverEndPoint);
         }
         catch { }
     }
@@ -389,7 +392,7 @@ public class NewSocketsUDPClient : MonoBehaviour
 
         try
         {
-            m_socket.SendTo(payload, m_serverEndPoint);
+            m_sim.Send(payload, m_serverEndPoint);
         }
         catch { }
     }
@@ -401,8 +404,9 @@ public class NewSocketsUDPClient : MonoBehaviour
     void ClientThread()
     {
         m_socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+        m_sim.m_socket = m_socket;
         m_serverEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), port);
-        SendString("JOIN:" + userName);
+        SendDirect("JOIN:" + userName);
 
         Debug.Log("[CLIENT] UDP Ready, connecting to " + m_serverEndPoint);
 
@@ -422,6 +426,19 @@ public class NewSocketsUDPClient : MonoBehaviour
             }
             catch { if (!m_running) break; }
         }
+    }
+
+    //Used for JOIN and LEAVE, they do not go through the simulator
+    void SendDirect(string text)
+    {
+        if (m_socket == null || m_serverEndPoint == null) return;
+
+        byte[] body = Encoding.UTF8.GetBytes(text);
+        byte[] payload = new byte[body.Length + 1];
+        payload[0] = (byte)UDPPlayer.MsgType.Text;
+        Buffer.BlockCopy(body, 0, payload, 1, body.Length);
+
+        try { m_socket.SendTo(payload, m_serverEndPoint); } catch { }
     }
 
     // =============================================================================================
