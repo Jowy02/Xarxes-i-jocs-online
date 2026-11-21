@@ -27,6 +27,8 @@ public class UDPPlayer
 
     public CarNetworkState carNetworkState;
 
+    public bool hasState;
+
     public virtual void Write(BinaryWriter w)
     {
         w.Write(carNetworkState.position.x);

@@ -8,6 +8,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class NewSocketsUDPServer : MonoBehaviour
 {
@@ -54,9 +55,11 @@ public class NewSocketsUDPServer : MonoBehaviour
     public static ServerOps m_srv;
     float m_nextTick;
 
+    PickupManagerServer m_pickups;
+
     public BoostPickupState FindPickup(int id)
     {
-        return null;
+        return m_pickups.Find(id);
     }
 
     // =============================================================================================
@@ -66,6 +69,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     void Start()
     {
         var s = new ReplicationManagerServer(this);
+        m_pickups = new PickupManagerServer(s);
         m_srv = new ServerOps
         {
             markCreate = s.MarkCreate,
@@ -75,6 +79,7 @@ public class NewSocketsUDPServer : MonoBehaviour
         };
 
         if (Instance != this) return;
+        SceneManager.sceneLoaded += OnSceneLoaded;
         Application.runInBackground = true;
         if (autoStart) StartNetwork();
     }
@@ -127,6 +132,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        SceneManager.sceneLoaded -= OnSceneLoaded;
         Disconnect();
     }
 
@@ -556,5 +562,20 @@ public class NewSocketsUDPServer : MonoBehaviour
         m_bestLapName = "";
         m_bestLapTime = float.MaxValue;
         race_start = false;
+    }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (scene.name != "RaceTrack") return;
+
+        List<Vector3> positions = new List<Vector3>();
+
+        foreach (GameObject spawn in GameObject.FindGameObjectsWithTag("PickupSpawn"))
+        {
+            positions.Add(spawn.transform.position);
+        }
+
+        m_pickups.StartRound(positions);
+        Log("[SERVER] Pickups spawned: " + positions.Count);
     }
 }
