@@ -16,6 +16,17 @@ public class LobbyUDPUI : MonoBehaviour
     [SerializeField] private TMPro.TMP_InputField ipInput;
     [SerializeField] private TMPro.TMP_Text playersText;
 
+    [Header("Role Colors")]
+    [SerializeField] private Color disconnectedColor = Color.gray;
+    [SerializeField] private Color connectingColor = new Color(1f, 0.65f, 0f);
+    [SerializeField] private Color failedColor = Color.red;
+    [SerializeField] private Color connectedColor = Color.green;
+    [SerializeField] private float connectionTimeout = 5f;
+
+    private bool connectionAttempted = false;
+    private float connectionAttemptTime;
+    private bool connectionFailed = false;
+
     // CONNECTION BUTTONS
     [SerializeField] private Button hostButton;
     [SerializeField] private Button joinButton;
@@ -56,6 +67,7 @@ public class LobbyUDPUI : MonoBehaviour
         UpdateLobbyUI();
         UpdateChatUI();
         UpdateChatLog();
+        UpdateRoleText();
     }
 
     void Update()
@@ -71,6 +83,8 @@ public class LobbyUDPUI : MonoBehaviour
 
             if (isInLobby)
             {
+                connectionAttempted = false;
+                connectionFailed = false;
                 AddSystemMessage(ChatWelcomeMessage);
                 Debug.Log("[LOBBY] Successfully entered lobby!");
             }
@@ -81,29 +95,23 @@ public class LobbyUDPUI : MonoBehaviour
             }
         }
 
+        if (connectionAttempted && !isInLobby && !client.IsRunning() && Time.time - connectionAttemptTime >= connectionTimeout)
+            connectionFailed = true;
+
         UpdateLobbyUI();
-        playersText.text = "Players:\n" + client.GetPlayerNames();
+        playersText.text = client.GetPlayerNames();
         UpdateChatLog();
 
         startRaceButton.SetActive(isInLobby && client.isHost);
         leaveLobbyButton.SetActive(isInLobby);
 
-        if (!client.IsRunning())
+        if (!client.IsRunning() && client.isHost)
         {
-            roleText.text = "Not Connected";
-
-            if (client.isHost)
-            {
-                if (server != null) server.Disconnect();
-                client.isHost = false;
-            }
+            if (server != null) server.Disconnect();
+            client.isHost = false;
         }
-        else if (!isInLobby)
-            roleText.text = "Connecting...";
-        else if (client.isHost)
-            roleText.text = "Host";
-        else
-            roleText.text = "Client";
+
+        UpdateRoleText();
     }
 
     // LOBBY UI
@@ -117,32 +125,53 @@ public class LobbyUDPUI : MonoBehaviour
         if (client == null) return;
 
         bool attemptingConnection = client.IsRunning();
-
         hostButton.interactable = !attemptingConnection;
         joinButton.interactable = !attemptingConnection;
         nameInput.interactable = !attemptingConnection;
         ipInput.interactable = !attemptingConnection;
     }
 
+    void UpdateRoleText()
+    {
+        if (roleText == null || client == null) return;
+
+        if (isInLobby)
+        {
+            roleText.text = client.isHost ? "Host" : "Client";
+            roleText.color = connectedColor;
+        }
+        else if (connectionFailed)
+        {
+            roleText.text = "Connection Failed";
+            roleText.color = failedColor;
+        }
+        else if (connectionAttempted)
+        {
+            roleText.text = "Connecting...";
+            roleText.color = connectingColor;
+        }
+        else
+        {
+            roleText.text = "Not Connected";
+            roleText.color = disconnectedColor;
+        }
+    }
+
     // CHAT UI
     void UpdateChatUI()
     {
         bool enabled = isInLobby;
-
         chatInput.interactable = enabled;
         sendButton.interactable = enabled;
 
         if (chatInput.placeholder != null)
         {
             var placeholder = chatInput.placeholder.GetComponent<TMPro.TMP_Text>();
-
             if (placeholder != null)
                 placeholder.text = enabled ? "Type your message..." : "Chat disabled...";
         }
 
-        if (!enabled)
-            chatInput.text = "";
-
+        if (!enabled) chatInput.text = "";
         UpdateChatLog();
     }
 
@@ -170,18 +199,13 @@ public class LobbyUDPUI : MonoBehaviour
     void UpdatePlayerMessages()
     {
         string currentChat = client.GetChatLog();
-
-        string[] currentMessages = string.IsNullOrEmpty(currentChat)
-            ? new string[0]
-            : currentChat.Split('\n');
-
+        string[] currentMessages = string.IsNullOrEmpty(currentChat) ? new string[0] : currentChat.Split('\n');
         int overlap = 0;
         int maxOverlap = Mathf.Min(previousPlayerMessages.Length, currentMessages.Length);
 
         for (int i = maxOverlap; i > 0; i--)
         {
             bool matches = true;
-
             for (int j = 0; j < i; j++)
             {
                 if (previousPlayerMessages[previousPlayerMessages.Length - i + j] != currentMessages[j])
@@ -210,21 +234,14 @@ public class LobbyUDPUI : MonoBehaviour
         if (client == null || chatLog == null) return;
 
         UpdatePlayerMessages();
-
         string formattedChat = string.Join("\n", chatMessages);
-
         if (chatLog.text == formattedChat) return;
 
         bool atBottom = true;
-
         if (chatScroll != null)
         {
-            RectTransform viewport = chatScroll.viewport != null
-                ? chatScroll.viewport
-                : (RectTransform)chatScroll.transform;
-
-            atBottom = chatScroll.content.rect.height <= viewport.rect.height + 1f ||
-                       chatScroll.verticalNormalizedPosition <= 0.01f;
+            RectTransform viewport = chatScroll.viewport != null ? chatScroll.viewport : (RectTransform)chatScroll.transform;
+            atBottom = chatScroll.content.rect.height <= viewport.rect.height + 1f || chatScroll.verticalNormalizedPosition <= 0.01f;
         }
 
         chatLog.text = formattedChat;
@@ -239,9 +256,7 @@ public class LobbyUDPUI : MonoBehaviour
     // Prevents player messages from interpreting unintended Rich Text tags
     string EscapeRichText(string message)
     {
-        return message.Replace("&", "&amp;")
-                      .Replace("<", "&lt;")
-                      .Replace(">", "&gt;");
+        return message.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
     }
 
     // JOIN GAME
@@ -259,9 +274,7 @@ public class LobbyUDPUI : MonoBehaviour
         }
 
         IPAddress address;
-
-        if (!IPAddress.TryParse(ip, out address) ||
-            address.AddressFamily != AddressFamily.InterNetwork)
+        if (!IPAddress.TryParse(ip, out address) || address.AddressFamily != AddressFamily.InterNetwork)
         {
             Debug.Log("[LOBBY] Invalid IP.");
             return;
@@ -270,9 +283,12 @@ public class LobbyUDPUI : MonoBehaviour
         client.isHost = false;
         client.userName = playerName;
         client.serverIp = address.ToString();
-
+        connectionAttempted = true;
+        connectionFailed = false;
+        connectionAttemptTime = Time.time;
         client.StartNetwork();
 
+        UpdateRoleText();
         Debug.Log("[LOBBY] Joining lobby at " + client.serverIp);
     }
 
@@ -282,7 +298,6 @@ public class LobbyUDPUI : MonoBehaviour
         if (client.IsRunning()) return;
 
         string playerName = nameInput.text.Trim();
-
         if (string.IsNullOrEmpty(playerName) || playerName.Contains(","))
         {
             Debug.Log("[LOBBY] Invalid name (empty or contains a comma).");
@@ -305,11 +320,13 @@ public class LobbyUDPUI : MonoBehaviour
         client.userName = playerName;
         client.serverIp = "127.0.0.1";
         client.port = server.port;
-
         ipInput.text = "127.0.0.1";
-
+        connectionAttempted = true;
+        connectionFailed = false;
+        connectionAttemptTime = Time.time;
         client.StartNetwork();
 
+        UpdateRoleText();
         Debug.Log("[LOBBY] Hosting lobby...");
     }
 
@@ -319,27 +336,23 @@ public class LobbyUDPUI : MonoBehaviour
         if (client == null) return;
 
         bool wasInLobby = isInLobby;
-
         client.isHost = false;
         client.Disconnect();
-
-        if (server != null)
-            server.Disconnect();
+        if (server != null) server.Disconnect();
 
         isInLobby = false;
-
+        connectionAttempted = false;
+        connectionFailed = false;
         UpdateLobbyUI();
         UpdateChatUI();
 
-        playersText.text = "Players:";
+        playersText.text = "";
         roleText.text = "Not Connected";
-
+        roleText.color = disconnectedColor;
         startRaceButton.SetActive(false);
         leaveLobbyButton.SetActive(false);
 
-        if (wasInLobby)
-            AddSystemMessage(ChatLeftMessage);
-
+        if (wasInLobby) AddSystemMessage(ChatLeftMessage);
         Debug.Log("[LOBBY] Left lobby.");
     }
 
@@ -347,9 +360,7 @@ public class LobbyUDPUI : MonoBehaviour
     public void ReturnToMainMenu()
     {
         Debug.Log("[LOBBY] Returning to Main Menu...");
-
         LeaveGame();
-
         SceneManager.LoadScene(mainMenuSceneName);
     }
 
@@ -357,7 +368,6 @@ public class LobbyUDPUI : MonoBehaviour
     public void StartRace()
     {
         if (!IsInLobby() || !client.isHost) return;
-
         client.SendString("START_RACE:");
     }
 }
