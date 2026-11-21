@@ -1,4 +1,3 @@
-
 using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
@@ -16,9 +15,10 @@ public class LobbyUDPUI : MonoBehaviour
     [SerializeField] private TMPro.TMP_InputField ipInput;
     [SerializeField] private TMPro.TMP_Text playersText;
 
+    // ROLE COLORS
     [Header("Role Colors")]
     [SerializeField] private Color disconnectedColor = Color.gray;
-    [SerializeField] private Color connectingColor = new Color(1f, 0.65f, 0f);
+    [SerializeField] private Color connectingColor = new Color (1f, 0.65f, 0f);
     [SerializeField] private Color failedColor = Color.red;
     [SerializeField] private Color connectedColor = Color.green;
     [SerializeField] private float connectionTimeout = 5f;
