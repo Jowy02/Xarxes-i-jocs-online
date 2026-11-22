@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
@@ -16,20 +17,23 @@ public class NewSocketsUDPServer : MonoBehaviour
     public bool showDebugUI = true;
 
     public List<UDPPlayer> m_players = new List<UDPPlayer>();
-    public List<UDPPlayer> m_standings= new List<UDPPlayer>();
+    public List<UDPPlayer> m_standings = new List<UDPPlayer>();
 
     public static NewSocketsUDPServer Instance;
 
     NetSim m_sim;
 
     private int m_nextPlayerId = 0;
+    private int m_hostPlayerId = 0;
+    private bool m_waitingMigrationRejoin = false;
+    private int m_expectedSurvivorsCount = 0;
 
     const int MaxPacketSize = 64 * 1024;
 
     struct Packet
-    { 
-        public byte[] data; 
-        public EndPoint from; 
+    {
+        public byte[] data;
+        public EndPoint from;
     }
 
     Socket m_socket;
@@ -56,23 +60,31 @@ public class NewSocketsUDPServer : MonoBehaviour
         public Func<byte[]> write;
     }
     public static ServerOps m_srv;
+    private ReplicationManagerServer m_replicationManager;
     float m_nextTick;
 
     void Start()
     {
-        var s = new ReplicationManagerServer(this);
-        m_srv = new ServerOps
-        {
-            markCreate = s.MarkCreate,
-            markUpdate = s.MarkUpdate,
-            markDestroy = s.MarkDestroy,
-            write = s.WritePacket
-        };
+        InitReplicationManager();
 
         if (Instance != this) return;
         Application.runInBackground = true;
         if (autoStart) StartNetwork();
     }
+
+    void InitReplicationManager()
+    {
+        if (m_replicationManager != null) return;
+        m_replicationManager = new ReplicationManagerServer(this);
+        m_srv = new ServerOps
+        {
+            markCreate = m_replicationManager.MarkCreate,
+            markUpdate = m_replicationManager.MarkUpdate,
+            markDestroy = m_replicationManager.MarkDestroy,
+            write = m_replicationManager.WritePacket
+        };
+    }
+
     public bool StartNetwork()
     {
         if (m_running) return true;
@@ -101,10 +113,61 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         return true;
     }
+
+    public bool StartMigratedServer(int newHostId, string newHostName, int oldHostId, int expectedSurvivors)
+    {
+        Disconnect();
+        InitReplicationManager();
+        m_replicationManager.Reset();
+
+        m_standings.Clear();
+        m_endRaceTime = -1f;
+        m_bestLapName = "";
+        m_bestLapTime = float.MaxValue;
+
+        m_hostPlayerId = newHostId;
+        m_nextPlayerId = Mathf.Max(m_nextPlayerId, newHostId + 1);
+        race_start = true;
+        m_waitingMigrationRejoin = true;
+        m_expectedSurvivorsCount = Mathf.Max(1, expectedSurvivors);
+
+        if (!StartNetwork())
+        {
+            m_waitingMigrationRejoin = false;
+            race_start = false;
+            return false;
+        }
+
+        // Destroy the lost host car
+        m_srv.markDestroy(oldHostId);
+
+        StopCoroutine(nameof(MigrationResumeRoutine));
+        StartCoroutine(MigrationResumeRoutine(newHostName));
+        Log("[SERVER] Host migrated! New host: " + newHostName + " (ID: " + newHostId + ")");
+        return true;
+    }
+
+    IEnumerator MigrationResumeRoutine(string newHostName)
+    {
+        float pauseDeadline = Time.realtimeSinceStartup + 5.0f;
+        while (Time.realtimeSinceStartup < pauseDeadline)
+        {
+            yield return null;
+        }
+
+        m_waitingMigrationRejoin = false;
+        SendPlayerList();
+        SendRoster();
+        Broadcast("CHAT:[SYSTEM] New host assigned: " + newHostName + ". Resuming race!");
+        Broadcast("START_COUNTDOWN:5");
+    }
+
     public void Disconnect()
     {
         if (!m_running) return;
         m_running = false;
+        race_start = false;
+        m_waitingMigrationRejoin = false;
 
         if (m_socket != null)
         {
@@ -115,6 +178,9 @@ public class NewSocketsUDPServer : MonoBehaviour
         lock (m_knownClients) m_knownClients.Clear();
         lock (m_lastSeen) m_lastSeen.Clear();
         m_players.Clear();
+        m_standings.Clear();
+
+        if (m_replicationManager != null) m_replicationManager.Reset();
 
         Log("[SERVER] Stopped");
     }
@@ -177,12 +243,16 @@ public class NewSocketsUDPServer : MonoBehaviour
     {
         if (race_start)
         {
-            foreach (UDPPlayer play in m_players) m_srv.markUpdate(play.id);
+            foreach (UDPPlayer play in m_players)
+            {
+                if (play.hasReceivedTransform)
+                    m_srv.markUpdate(play.id);
+            }
         }
         byte[] pack = m_srv.write();
         foreach (EndPoint client in m_knownClients)
         {
-            try { m_sim.Send(pack, client); ; } catch { }
+            try { m_sim.Send(pack, client); } catch { }
         }
     }
 
@@ -201,7 +271,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             case UDPPlayer.MsgType.Text:
                 string content = Encoding.UTF8.GetString(data, 1, data.Length - 1);
                 HandleText(content, from);
-            break;
+                break;
 
             case UDPPlayer.MsgType.Transform:
                 lock (m_lastSeen) m_lastSeen[from] = Time.time;
@@ -210,11 +280,12 @@ public class NewSocketsUDPServer : MonoBehaviour
 
             default:
                 Log("[SERVER] Uknown message type: " + data[0]);
-            break;
+                break;
         }
     }
+
     void HandleText(string text, EndPoint from)
-    { 
+    {
         if (text == "LEAVE:")
         {
             RemovePlayer(from);
@@ -232,12 +303,12 @@ public class NewSocketsUDPServer : MonoBehaviour
         if (isNewPlayer)
         {
             Log("[SERVER] NEW PLAYER CONNECTED: " + from.ToString());
-            
+
             lock (m_knownClients) m_knownClients.Add(from);
         }
 
         // =========================================================================================
-        // PLAYER JOIN
+        // PLAYER JOIN & HOST MIGRATION
         // =========================================================================================
 
         if (text.StartsWith("JOIN:"))
@@ -260,7 +331,48 @@ public class NewSocketsUDPServer : MonoBehaviour
             Log("[SERVER] Player registered: " + player.name + " with ID: " + assignedId);
             Log("[SERVER] Total players: " + m_players.Count);
             SendPlayerList();
+            SendRoster();
 
+            return;
+        }
+
+        if (text.StartsWith("REJOIN:"))
+        {
+            string body = text.Substring(7);
+            int sep = body.IndexOf(':');
+            if (sep <= 0) return;
+
+            int rejoinId;
+            if (!int.TryParse(body.Substring(0, sep), out rejoinId)) return;
+            string playerName = body.Substring(sep + 1).Trim();
+            if (string.IsNullOrEmpty(playerName)) return;
+
+            UDPPlayer existing = null;
+            for (int i = 0; i < m_players.Count; i++)
+            {
+                if (m_players[i].id == rejoinId)
+                {
+                    existing = m_players[i];
+                    break;
+                }
+            }
+
+            if (existing == null)
+            {
+                existing = new UDPPlayer(playerName, from, rejoinId);
+                m_players.Add(existing);
+                m_nextPlayerId = Mathf.Max(m_nextPlayerId, rejoinId + 1);
+            }
+            else
+            {
+                existing.endpoint = from;
+                existing.name = playerName;
+            }
+
+            Send(UDPPlayer.MsgType.Text, "YOUR_ID:" + rejoinId, from);
+            Send(UDPPlayer.MsgType.Text, "SERVER_ACTIVE", from);
+            SendPlayerList();
+            SendRoster();
             return;
         }
 
@@ -275,6 +387,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             Broadcast(text);
             return;
         }
+
         if (text.StartsWith("LAPTIME:"))
         {
             float t;
@@ -293,6 +406,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             }
             return;
         }
+
         if (text.StartsWith("LAP:"))
         {
             for (int i = 0; i < m_players.Count; i++)
@@ -315,6 +429,9 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         if (text.StartsWith("START_RACE:"))
         {
+            if (m_replicationManager != null) m_replicationManager.Reset();
+            SendRoster();
+
             string startMessage = "START_RACE:";
 
             for (int i = 0; i < m_players.Count; i++)
@@ -334,7 +451,10 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         if (text.StartsWith("READY_FOR_COUNTDOWN:"))
         {
-            Broadcast("START_COUNTDOWN:5");
+            if (!m_waitingMigrationRejoin)
+            {
+                Broadcast("START_COUNTDOWN:5");
+            }
             return;
         }
 
@@ -343,6 +463,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             Log("[SERVER] Restarting race for all players!");
 
             m_standings.Clear();
+            if (m_replicationManager != null) m_replicationManager.Reset();
 
             foreach (GameObject car in GameObject.FindGameObjectsWithTag("Car_"))
             {
@@ -376,6 +497,7 @@ public class NewSocketsUDPServer : MonoBehaviour
                     play.carNetworkState.rotation = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
                     play.carNetworkState.isDrifting = reader.ReadBoolean();
                     play.carNetworkState.skinId = reader.ReadInt32();
+                    play.hasReceivedTransform = true;
                     break;
                 }
             }
@@ -410,9 +532,10 @@ public class NewSocketsUDPServer : MonoBehaviour
             }
         }
     }
+
     void Send(UDPPlayer.MsgType type, string text, EndPoint client)
     {
-        if (m_socket == null ) return;
+        if (m_socket == null) return;
 
         byte[] body = Encoding.UTF8.GetBytes(text);
         byte[] payload = new byte[body.Length + 1];
@@ -425,6 +548,7 @@ public class NewSocketsUDPServer : MonoBehaviour
         }
         catch { }
     }
+
     // =============================================================================================
     // SERVER NETWORK THREAD
     // =============================================================================================
@@ -491,6 +615,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     // =============================================================================================
     // List
     // =============================================================================================
+
     void SendPlayerList()
     {
         string message = "PLAYERS:";
@@ -506,9 +631,63 @@ public class NewSocketsUDPServer : MonoBehaviour
         Broadcast(message);
     }
 
+    string GetServerOutboundIP()
+    {
+        try
+        {
+            using (Socket s = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp))
+            {
+                s.Connect("8.8.8.8", 65530);
+                IPEndPoint ep = s.LocalEndPoint as IPEndPoint;
+                if (ep != null) return ep.Address.ToString();
+            }
+        }
+        catch { }
+
+        try
+        {
+            IPAddress[] addresses = Dns.GetHostAddresses(Dns.GetHostName());
+            for (int i = 0; i < addresses.Length; i++)
+            {
+                if (addresses[i].AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(addresses[i]))
+                    return addresses[i].ToString();
+            }
+        }
+        catch { }
+
+        return "127.0.0.1";
+    }
+
+    void SendRoster()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.Append("ROSTER:");
+        sb.Append(m_hostPlayerId);
+        sb.Append(';');
+
+        for (int i = 0; i < m_players.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            IPEndPoint ipEp = m_players[i].endpoint as IPEndPoint;
+            string ipStr = "127.0.0.1";
+            if (ipEp != null)
+            {
+                ipStr = IPAddress.IsLoopback(ipEp.Address)
+                    ? GetServerOutboundIP()
+                    : ipEp.Address.ToString();
+            }
+
+            string safeName = m_players[i].name.Replace("|", "").Replace(";", "").Replace(",", "");
+            sb.Append(m_players[i].id).Append('|').Append(safeName).Append('|').Append(ipStr);
+        }
+
+        Broadcast(sb.ToString());
+    }
+
     // =============================================================================================
     // Remove Players
     // =============================================================================================
+
     void RemovePlayer(EndPoint endpoint)
     {
         lock (m_lastSeen) m_lastSeen.Remove(endpoint);
@@ -521,7 +700,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             if (m_players[i].endpoint.Equals(endpoint))
             {
                 Log("[SERVER] Player left: " + m_players[i].name);
-                if(race_start)
+                if (race_start)
                 {
                     m_srv.markDestroy(m_players[i].id);
                 }
@@ -532,7 +711,9 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         Broadcast("DISC:" + carToRemove + "," + playersId);
         SendPlayerList();
+        SendRoster();
     }
+
     void EndRace()
     {
         m_endRaceTime = -1f;

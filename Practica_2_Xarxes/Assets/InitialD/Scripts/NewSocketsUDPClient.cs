@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -10,6 +11,13 @@ using UnityEngine;
 
 public class NewSocketsUDPClient : MonoBehaviour
 {
+    public struct RosterEntry
+    {
+        public int id;
+        public string name;
+        public string ip;
+    }
+
     public string serverIp = "127.0.0.1";
     public int port = 9050;
     public string userName = "Player";
@@ -27,6 +35,8 @@ public class NewSocketsUDPClient : MonoBehaviour
     private List<string> m_players = new List<string>();
     readonly List<string> m_chatlog = new List<string>();
     private List<int> m_racePlayerIds = new List<int>();
+    private readonly List<RosterEntry> m_roster = new List<RosterEntry>();
+    private int m_currentHostId = 0;
 
     const int MaxPacketSize = 64 * 1024;
 
@@ -40,14 +50,21 @@ public class NewSocketsUDPClient : MonoBehaviour
     float m_pingTimer = 0f;
     private float m_lastServerResponse;
 
+    private bool m_isMigrating = false;
+    private bool m_waitingWelcome = false;
+    private float m_rejoinRetryTimer = 0f;
+    private float m_migrationDeadline = 0f;
+
     public static event Action<UDPPlayer.CarNetworkState> OnCarTransformReceived;
+    public static event Action<int> OnCarDestroyed;
     public static event Action OnRaceRestarted;
     public static event Action OnStartCountdownReceived;
+    public static event Action<string, bool> OnHostMigrationStarted;
 
     public LinkingContext LinkingContext { get; } = new LinkingContext();
     private int m_lastSequence = -1;
 
-    NetSim m_sim; 
+    NetSim m_sim;
 
     // =============================================================================================
     // START / STOP
@@ -68,16 +85,26 @@ public class NewSocketsUDPClient : MonoBehaviour
         if (autoStart) StartNetwork();
     }
 
-    public void StartNetwork()
+    public void StartNetwork(bool isMigrationRejoin = false)
     {
         if (m_running) return;
-        m_localPlayerId = -1;
+
+        if (!isMigrationRejoin)
+        {
+            m_localPlayerId = -1;
+            m_racePlayerIds.Clear();
+            m_roster.Clear();
+            m_currentHostId = 0;
+        }
+
+        m_lastSequence = -1;
+        m_waitingWelcome = isMigrationRejoin;
+        m_rejoinRetryTimer = 0.5f;
         m_running = true;
         m_lastServerResponse = Time.realtimeSinceStartup;
         m_pingTimer = 0f;
-        m_racePlayerIds.Clear();
 
-        Thread t = new Thread(ClientThread);
+        Thread t = new Thread(() => ClientThread(isMigrationRejoin));
         t.IsBackground = true;
         m_threads.Add(t);
         t.Start();
@@ -85,10 +112,15 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     public void Disconnect()
     {
-        if (!m_running) return;
+        DisconnectInternal(true);
+    }
+
+    void DisconnectInternal(bool sendLeave)
+    {
+        if (!m_running && m_socket == null) return;
 
         // By sending Leave here before closing the socket, we can skip the wainting timeout
-        SendDirect("LEAVE:");
+        if (sendLeave) SendDirect("LEAVE:");
         m_running = false;
 
         if (m_socket != null)
@@ -97,7 +129,13 @@ public class NewSocketsUDPClient : MonoBehaviour
             m_socket = null;
         }
 
-        m_players.Clear();
+        while (m_inbox.TryDequeue(out _)) { }
+        m_lastSequence = -1;
+
+        if (!m_isMigrating)
+        {
+            m_players.Clear();
+        }
 
         Debug.Log("[CLIENT] Stopped");
     }
@@ -105,7 +143,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     void OnDestroy()
     {
         if (Instance == this) Instance = null;
-        Disconnect();
+        DisconnectInternal(true);
     }
 
     // =============================================================================================
@@ -127,7 +165,7 @@ public class NewSocketsUDPClient : MonoBehaviour
                 case UDPPlayer.MsgType.Text:
                     string content = Encoding.UTF8.GetString(data, 1, data.Length - 1);
                     ProcessGameMessage(content);
-                break;
+                    break;
 
                 //case UDPPlayer.MsgType.Transform:
                 //    UDPPlayer.CarNetworkState state = NetworkSerializer.DeserializeCar(data);
@@ -138,20 +176,39 @@ public class NewSocketsUDPClient : MonoBehaviour
                     var r = new BinaryReader(new MemoryStream(data));
                     r.ReadByte();
                     ReadPacket(r);
-                break;
+                    break;
 
                 default:
                     Debug.Log("[SERVER] Uknown message type: " + data[0]);
-                break;
+                    break;
             }
         }
 
         if (!m_running) return;
 
-        // Stop the client after five seconds without a server response
-        if (Time.realtimeSinceStartup - m_lastServerResponse >= 5f)
+        // Retry REJOIN during host migration until YOUR_ID confirms connection
+        if (m_isMigrating && m_waitingWelcome)
         {
-            Debug.Log("[CLIENT] Server connection timed out. Returning to Lobby...");
+            m_rejoinRetryTimer -= Time.deltaTime;
+            if (m_rejoinRetryTimer <= 0f)
+            {
+                m_rejoinRetryTimer = 0.5f;
+                SendDirect("REJOIN:" + m_localPlayerId + ":" + userName);
+            }
+        }
+
+        if (m_isMigrating && Time.realtimeSinceStartup >= m_migrationDeadline)
+        {
+            Debug.Log("[CLIENT] Host migration timed out. Returning to Lobby...");
+            m_isMigrating = false;
+            ReturnToLobbyFallback();
+            return;
+        }
+
+        // Stop the client after five seconds without a server response
+        if (!m_isMigrating && Time.realtimeSinceStartup - m_lastServerResponse >= 5f)
+        {
+            Debug.Log("[CLIENT] Server connection timed out. Attempting host migration or returning to Lobby...");
             HandleHostLost();
             return;
         }
@@ -167,11 +224,106 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     void HandleHostLost()
     {
-        Disconnect();
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "RaceTrack" || isHost)
+        {
+            ReturnToLobbyFallback();
+            return;
+        }
+
+        RosterEntry? nextHost = null;
+        int bestId = int.MaxValue;
+        for (int i = 0; i < m_roster.Count; i++)
+        {
+            if (m_roster[i].id == m_currentHostId) continue;
+            if (m_roster[i].id < bestId)
+            {
+                bestId = m_roster[i].id;
+                nextHost = m_roster[i];
+            }
+        }
+
+        if (!nextHost.HasValue)
+        {
+            ReturnToLobbyFallback();
+            return;
+        }
+
+        StartCoroutine(HostMigrationRoutine(nextHost.Value));
+    }
+
+    IEnumerator HostMigrationRoutine(RosterEntry newHost)
+    {
+        m_isMigrating = true;
+        m_migrationDeadline = Time.realtimeSinceStartup + 12f;
+
+        int lostHostId = m_currentHostId;
+        m_roster.RemoveAll(r => r.id == lostHostId);
+        m_racePlayerIds.Remove(lostHostId);
+
+        GameObject oldHostGo = LinkingContext.Find(lostHostId);
+        if (oldHostGo != null)
+        {
+            LinkingContext.Unregister(lostHostId);
+            Destroy(oldHostGo);
+            OnCarDestroyed?.Invoke(lostHostId);
+        }
+
+        AddLocalChatMessage("[SYSTEM] Host connection lost! Searching for a new host...");
+        AddLocalChatMessage("[SYSTEM] Assigning new host: " + newHost.name + "...");
+
+        DisconnectInternal(false);
+
+        bool iAmNewHost = (newHost.id == m_localPlayerId);
+        OnHostMigrationStarted?.Invoke(newHost.name, iAmNewHost);
+
+        if (iAmNewHost)
+        {
+            isHost = true;
+            m_currentHostId = m_localPlayerId;
+            serverIp = "127.0.0.1";
+
+            NewSocketsUDPServer srv = NewSocketsUDPServer.Instance;
+            if (srv == null || !srv.StartMigratedServer(m_localPlayerId, userName, lostHostId, m_roster.Count))
+            {
+                Debug.LogError("[CLIENT] Could not start migrated server.");
+                m_isMigrating = false;
+                ReturnToLobbyFallback();
+                yield break;
+            }
+
+            StartNetwork(true);
+        }
+        else
+        {
+            isHost = false;
+            m_currentHostId = newHost.id;
+            serverIp = newHost.ip;
+
+            // Wait to the new host finishes binding port 9050
+            yield return new WaitForSecondsRealtime(0.5f);
+            StartNetwork(true);
+        }
+    }
+
+    void ReturnToLobbyFallback()
+    {
+        DisconnectInternal(false);
+        isHost = false;
+        if (NewSocketsUDPServer.Instance != null) NewSocketsUDPServer.Instance.Disconnect();
+
         // Return to lobby if dropped during a race
         if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "RaceTrack")
         {
             UnityEngine.SceneManagement.SceneManager.LoadScene(lobbySceneName);
+        }
+    }
+
+    public void AddLocalChatMessage(string msg)
+    {
+        lock (m_chatlog)
+        {
+            m_chatlog.Add(msg);
+            if (m_chatlog.Count > 100) m_chatlog.RemoveAt(0);
         }
     }
 
@@ -200,13 +352,14 @@ public class NewSocketsUDPClient : MonoBehaviour
                     LinkingContext.Unregister(id);
                     Destroy(go);
                     m_racePlayerIds.Remove(id);
+                    OnCarDestroyed?.Invoke(id);
                 }
                 continue;
             }
 
             byte type = reader.ReadByte(); // type 0 = Car
 
-            if (id == m_localPlayerId)
+            if (id == m_localPlayerId || go == null)
             {
                 reader.ReadBytes(29); // skip its data: 6 floats + bool + int
                 continue;
@@ -236,6 +389,10 @@ public class NewSocketsUDPClient : MonoBehaviour
                     }
                 }
             }
+            else
+            {
+                reader.ReadBytes(29);
+            }
         }
     }
 
@@ -250,6 +407,8 @@ public class NewSocketsUDPClient : MonoBehaviour
             if (int.TryParse(message.Substring(8), out receivedId))
             {
                 m_localPlayerId = receivedId;
+                m_waitingWelcome = false;
+                m_lastServerResponse = Time.realtimeSinceStartup;
                 Debug.Log("[CLIENT] My player ID: " + m_localPlayerId);
             }
 
@@ -280,6 +439,36 @@ public class NewSocketsUDPClient : MonoBehaviour
             Debug.Log("[CLIENT] Players: " + names);
             return;
         }
+
+        if (message.StartsWith("ROSTER:"))
+        {
+            string payload = message.Substring(7);
+            int semi = payload.IndexOf(';');
+            if (semi > 0)
+            {
+                int hostId;
+                if (int.TryParse(payload.Substring(0, semi), out hostId))
+                    m_currentHostId = hostId;
+
+                m_roster.Clear();
+                string listPart = payload.Substring(semi + 1);
+                if (!string.IsNullOrEmpty(listPart))
+                {
+                    string[] entries = listPart.Split(',');
+                    for (int i = 0; i < entries.Length; i++)
+                    {
+                        string[] fields = entries[i].Split('|');
+                        int pid;
+                        if (fields.Length == 3 && int.TryParse(fields[0], out pid))
+                        {
+                            m_roster.Add(new RosterEntry { id = pid, name = fields[1], ip = fields[2] });
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
         if (message.StartsWith("DISC:"))
         {
             string playerText = message.Substring(5);
@@ -310,6 +499,7 @@ public class NewSocketsUDPClient : MonoBehaviour
                 return;
             }
 
+            m_lastSequence = -1;
             string idsText = message.Substring(11);
             string[] receivedIds = idsText.Split(',');
 
@@ -349,12 +539,16 @@ public class NewSocketsUDPClient : MonoBehaviour
         if (message.StartsWith("RESTART_RACE:"))
         {
             Debug.Log("[CLIENT] Race restarted by host.");
+            m_lastSequence = -1;
             OnRaceRestarted?.Invoke();
             return;
         }
 
         if (message.StartsWith("START_COUNTDOWN:"))
         {
+            m_isMigrating = false;
+            m_waitingWelcome = false;
+            m_lastSequence = -1;
             OnStartCountdownReceived?.Invoke();
             return;
         }
@@ -371,7 +565,7 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     public void SendCarTransform(int id, Vector3 pos, Vector3 rot, bool isDrifting, int skinId)
     {
-        if (m_socket == null || m_serverEndPoint == null || !m_running) return;
+        if (m_socket == null || m_serverEndPoint == null || !m_running || m_waitingWelcome) return;
 
         byte[] payload = NetworkSerializer.SerializeCar(id, pos, rot, isDrifting, skinId);
         try
@@ -401,12 +595,16 @@ public class NewSocketsUDPClient : MonoBehaviour
     // CLIENT NETWORK THREAD
     // =============================================================================================
 
-    void ClientThread()
+    void ClientThread(bool isMigrationRejoin)
     {
         m_socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         m_sim.m_socket = m_socket;
         m_serverEndPoint = new IPEndPoint(IPAddress.Parse(serverIp), port);
-        SendDirect("JOIN:" + userName);
+
+        if (isMigrationRejoin && m_localPlayerId >= 0)
+            SendDirect("REJOIN:" + m_localPlayerId + ":" + userName);
+        else
+            SendDirect("JOIN:" + userName);
 
         Debug.Log("[CLIENT] UDP Ready, connecting to " + m_serverEndPoint);
 
@@ -493,5 +691,9 @@ public class NewSocketsUDPClient : MonoBehaviour
     public int[] GetRacePlayerIds()
     {
         return m_racePlayerIds.ToArray();
+    }
+    public bool IsMigrating()
+    {
+        return m_isMigrating;
     }
 }

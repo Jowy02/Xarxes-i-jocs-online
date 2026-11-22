@@ -59,6 +59,13 @@ public class InRaceMenuUI : MonoBehaviour
     public void ToggleMenu()
     {
         isOpen = !isOpen;
+
+        if (restartRaceButton != null)
+        {
+            restartRaceButton.gameObject.SetActive(
+                raceSpawner != null && raceSpawner.CanRestartRace
+            );
+        }
     }
 
     private void AnimateMenu()

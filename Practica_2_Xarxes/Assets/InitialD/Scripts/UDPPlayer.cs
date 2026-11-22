@@ -8,12 +8,14 @@ public class UDPPlayer
     public string name;
     public EndPoint endpoint;
     public int id;
+    public bool hasReceivedTransform;
 
     public UDPPlayer(string name, EndPoint endpoint, int id = 0)
     {
         this.name = name;
         this.endpoint = endpoint;
         this.id = id;
+        this.hasReceivedTransform = false;
     }
 
     public struct CarNetworkState

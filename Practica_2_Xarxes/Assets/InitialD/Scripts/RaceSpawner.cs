@@ -16,6 +16,11 @@ public class RaceSpawner : MonoBehaviour
     // Client and local player info
     [SerializeField] private TMPro.TMP_Text countdownText;
 
+    // Host Migration UI
+    [SerializeField] private GameObject migrationBWOverlay;
+    [SerializeField] private TMPro.TMP_Text migrationStatusText;
+    [SerializeField] private TMPro.TMP_Text playersHudText;
+
     private NewSocketsUDPClient client;
     private int localPlayerId = -1;
 
@@ -47,6 +52,10 @@ public class RaceSpawner : MonoBehaviour
         {
             countdownText.gameObject.SetActive(false);
         }
+
+        if (migrationBWOverlay != null) migrationBWOverlay.SetActive(false);
+        if (migrationStatusText != null) migrationStatusText.gameObject.SetActive(false);
+        RefreshPlayersHud();
 
         if ((!testMode && client == null) || carPrefab == null || cameraFollow == null)
         {
@@ -117,17 +126,21 @@ public class RaceSpawner : MonoBehaviour
     void OnEnable()
     {
         NewSocketsUDPClient.OnCarTransformReceived += UpdateRemoteCar;
+        NewSocketsUDPClient.OnCarDestroyed += HandleCarDestroyed;
         NewSocketsUDPClient.OnRaceRestarted += HandleRaceRestart;
         NewSocketsUDPClient.OnFinishCountdown += ShowFinishCountdown;
         NewSocketsUDPClient.OnStartCountdownReceived += HandleStartCountdown;
+        NewSocketsUDPClient.OnHostMigrationStarted += HandleHostMigrationStarted;
     }
 
     void OnDisable()
     {
         NewSocketsUDPClient.OnCarTransformReceived -= UpdateRemoteCar;
+        NewSocketsUDPClient.OnCarDestroyed -= HandleCarDestroyed;
         NewSocketsUDPClient.OnRaceRestarted -= HandleRaceRestart;
         NewSocketsUDPClient.OnFinishCountdown -= ShowFinishCountdown;
         NewSocketsUDPClient.OnStartCountdownReceived -= HandleStartCountdown;
+        NewSocketsUDPClient.OnHostMigrationStarted -= HandleHostMigrationStarted;
     }
 
     void OnDestroy()
@@ -238,16 +251,27 @@ public class RaceSpawner : MonoBehaviour
         }
     }
 
-    void HandleStartCountdown()
+    void HandleCarDestroyed(int carId)
+    {
+        cars.Remove(carId);
+        targetPositions.Remove(carId);
+        targetRotations.Remove(carId);
+        RefreshPlayersHud();
+    }
+
+    void RefreshPlayersHud()
+    {
+        if (playersHudText != null && client != null)
+        {
+            playersHudText.text = client.GetPlayerNames();
+        }
+    }
+
+    void HandleHostMigrationStarted(string newHostName, bool iAmNewHost)
     {
         if (testMode) return;
 
         StopAllCoroutines();
-        StartCoroutine(StartCountdownRoutine());
-    }
-
-    IEnumerator StartCountdownRoutine()
-    {
         raceStarted = false;
 
         if (localController != null)
@@ -256,6 +280,41 @@ public class RaceSpawner : MonoBehaviour
             localController.enabled = false;
         }
 
+        if (localCar != null)
+        {
+            Rigidbody rb = localCar.GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = true;
+        }
+
+        ClearCarEffects();
+
+        if (countdownText != null) countdownText.gameObject.SetActive(false);
+        if (migrationBWOverlay != null) migrationBWOverlay.SetActive(true);
+
+        RefreshPlayersHud();
+        StartCoroutine(MigrationTextStagesRoutine(newHostName, iAmNewHost));
+    }
+
+    IEnumerator MigrationTextStagesRoutine(string newHostName, bool iAmNewHost)
+    {
+        if (migrationStatusText != null)
+        {
+            migrationStatusText.gameObject.SetActive(true);
+            migrationStatusText.text = "HOST CONNECTION LOST\nSEARCHING FOR NEW HOST...";
+        }
+
+        yield return new WaitForSecondsRealtime(2.5f);
+
+        if (migrationStatusText != null)
+        {
+            migrationStatusText.text = iAmNewHost
+                ? "NEW HOST ASSIGNED\nYOU ARE THE NEW HOST!"
+                : "NEW HOST ASSIGNED\nNEW HOST: " + newHostName;
+        }
+    }
+
+    void ClearCarEffects()
+    {
         foreach (KeyValuePair<int, GameObject> entry in cars)
         {
             if (entry.Value != null)
@@ -281,6 +340,33 @@ public class RaceSpawner : MonoBehaviour
                 }
             }
         }
+    }
+
+    void HandleStartCountdown()
+    {
+        if (testMode) return;
+
+        StopAllCoroutines();
+        StartCoroutine(StartCountdownRoutine());
+    }
+
+    IEnumerator StartCountdownRoutine()
+    {
+        raceStarted = false;
+
+        if (localController != null)
+        {
+            localController.ResetCarForces();
+            localController.enabled = false;
+        }
+
+        ClearCarEffects();
+
+        if (migrationBWOverlay != null && migrationBWOverlay.activeSelf && migrationStatusText != null)
+        {
+            migrationStatusText.gameObject.SetActive(true);
+            migrationStatusText.text = "RESUMING RACE...";
+        }
 
         int count = 5;
 
@@ -301,12 +387,23 @@ public class RaceSpawner : MonoBehaviour
             countdownText.text = "GO!";
         }
 
+        if (migrationBWOverlay != null) migrationBWOverlay.SetActive(false);
+        if (migrationStatusText != null) migrationStatusText.gameObject.SetActive(false);
+
         raceStarted = true;
+
+        if (localCar != null)
+        {
+            Rigidbody rb = localCar.GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = false;
+        }
 
         if (localController != null)
         {
             localController.enabled = true;
         }
+
+        RefreshPlayersHud();
 
         yield return new WaitForSeconds(1f);
 
@@ -368,7 +465,7 @@ public class RaceSpawner : MonoBehaviour
 
     void SendLocalCarState()
     {
-        if (client == null || !client.IsRunning()) return;
+        if (client == null || !client.IsRunning() || client.IsMigrating()) return;
         if (localCar == null || localController == null) return;
 
         sendTimer += Time.deltaTime;

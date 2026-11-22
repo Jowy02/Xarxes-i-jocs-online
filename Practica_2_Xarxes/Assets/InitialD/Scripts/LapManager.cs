@@ -19,6 +19,7 @@ public class LapManager : MonoBehaviour
     private int currentLap = 1;
     private float lapStartTime;
     private bool isFinished = false;
+    private float pausedAtTime = -1f;
 
     private NewSocketsUDPClient client;
 
@@ -36,11 +37,29 @@ public class LapManager : MonoBehaviour
     void OnEnable()
     {
         NewSocketsUDPClient.OnRaceRestarted += RestartLaps;
+        NewSocketsUDPClient.OnHostMigrationStarted += PauseLapTimer;
+        NewSocketsUDPClient.OnStartCountdownReceived += ResumeLapTimer;
     }
 
     void OnDisable()
     {
         NewSocketsUDPClient.OnRaceRestarted -= RestartLaps;
+        NewSocketsUDPClient.OnHostMigrationStarted -= PauseLapTimer;
+        NewSocketsUDPClient.OnStartCountdownReceived -= ResumeLapTimer;
+    }
+
+    void PauseLapTimer(string _, bool __)
+    {
+        if (pausedAtTime < 0f) pausedAtTime = Time.time;
+    }
+
+    void ResumeLapTimer()
+    {
+        if (pausedAtTime >= 0f)
+        {
+            lapStartTime += (Time.time - pausedAtTime);
+            pausedAtTime = -1f;
+        }
     }
 
     public void RestartLaps()

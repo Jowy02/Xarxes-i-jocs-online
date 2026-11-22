@@ -16,6 +16,13 @@ public class ReplicationManagerServer
         m_server = server;
     }
 
+    public void Reset()
+    {
+        m_pending.Clear();
+        m_repeat.Clear();
+        m_sequence = 0;
+    }
+
     public void MarkCreate(int id)
     {
         m_pending[id] = UDPPlayer.ReplicationAction.Create;
