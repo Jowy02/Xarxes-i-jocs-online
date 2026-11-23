@@ -48,7 +48,7 @@ public class LapManager : MonoBehaviour
         NewSocketsUDPClient.OnStartCountdownReceived -= ResumeLapTimer;
     }
 
-    void PauseLapTimer(string _, bool __)
+    void PauseLapTimer(string _, bool __, bool ___)
     {
         if (pausedAtTime < 0f) pausedAtTime = Time.time;
     }

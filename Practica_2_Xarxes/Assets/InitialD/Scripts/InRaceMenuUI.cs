@@ -10,6 +10,7 @@ public class InRaceMenuUI : MonoBehaviour
 
     [Header("Buttons")]
     [SerializeField] private Button restartRaceButton;
+    [SerializeField] private Button exitRaceButton;
 
     private RaceSpawner raceSpawner;
     private Vector2 openPosition;
@@ -43,6 +44,11 @@ public class InRaceMenuUI : MonoBehaviour
             );
 
             restartRaceButton.onClick.AddListener(RestartRace);
+        }
+
+        if (exitRaceButton != null)
+        {
+            exitRaceButton.onClick.AddListener(ExitRace);
         }
     }
 
@@ -90,11 +96,23 @@ public class InRaceMenuUI : MonoBehaviour
         isOpen = false;
     }
 
+    private void ExitRace()
+    {
+        if (raceSpawner == null) return;
+
+        isOpen = false;
+        raceSpawner.OnClickExitRace();
+    }
+
     void OnDestroy()
     {
         if (restartRaceButton != null)
         {
             restartRaceButton.onClick.RemoveListener(RestartRace);
+        }
+        if (exitRaceButton != null)
+        {
+            exitRaceButton.onClick.RemoveListener(ExitRace);
         }
     }
 }

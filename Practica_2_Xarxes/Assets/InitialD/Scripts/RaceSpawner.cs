@@ -131,6 +131,7 @@ public class RaceSpawner : MonoBehaviour
         NewSocketsUDPClient.OnFinishCountdown += ShowFinishCountdown;
         NewSocketsUDPClient.OnStartCountdownReceived += HandleStartCountdown;
         NewSocketsUDPClient.OnHostMigrationStarted += HandleHostMigrationStarted;
+        NewSocketsUDPClient.OnPlayersListUpdated += RefreshPlayersHud;
     }
 
     void OnDisable()
@@ -141,6 +142,7 @@ public class RaceSpawner : MonoBehaviour
         NewSocketsUDPClient.OnFinishCountdown -= ShowFinishCountdown;
         NewSocketsUDPClient.OnStartCountdownReceived -= HandleStartCountdown;
         NewSocketsUDPClient.OnHostMigrationStarted -= HandleHostMigrationStarted;
+        NewSocketsUDPClient.OnPlayersListUpdated -= RefreshPlayersHud;
     }
 
     void OnDestroy()
@@ -267,7 +269,7 @@ public class RaceSpawner : MonoBehaviour
         }
     }
 
-    void HandleHostMigrationStarted(string newHostName, bool iAmNewHost)
+    void HandleHostMigrationStarted(string newHostName, bool iAmNewHost, bool hostLeftVoluntarily)
     {
         if (testMode) return;
 
@@ -292,15 +294,17 @@ public class RaceSpawner : MonoBehaviour
         if (migrationBWOverlay != null) migrationBWOverlay.SetActive(true);
 
         RefreshPlayersHud();
-        StartCoroutine(MigrationTextStagesRoutine(newHostName, iAmNewHost));
+        StartCoroutine(MigrationTextStagesRoutine(newHostName, iAmNewHost, hostLeftVoluntarily));
     }
 
-    IEnumerator MigrationTextStagesRoutine(string newHostName, bool iAmNewHost)
+    IEnumerator MigrationTextStagesRoutine(string newHostName, bool iAmNewHost, bool hostLeftVoluntarily)
     {
         if (migrationStatusText != null)
         {
             migrationStatusText.gameObject.SetActive(true);
-            migrationStatusText.text = "HOST CONNECTION LOST\nSEARCHING FOR NEW HOST...";
+            migrationStatusText.text = hostLeftVoluntarily
+                ? "HOST LEFT THE RACE\nSEARCHING FOR NEW HOST..."
+                : "HOST CONNECTION LOST\nSEARCHING FOR NEW HOST...";
         }
 
         yield return new WaitForSecondsRealtime(2.5f);
@@ -419,6 +423,34 @@ public class RaceSpawner : MonoBehaviour
         if (client == null || !client.isHost) return;
 
         client.SendString("RESTART_RACE:");
+    }
+
+    public void OnClickExitRace()
+    {
+        if (testMode)
+        {
+            UnityEngine.SceneManagement.SceneManager.LoadScene("MainMenu");
+            return;
+        }
+
+        if (client == null) return;
+
+        if (client.isHost)
+        {
+            NewSocketsUDPServer server = NewSocketsUDPServer.Instance;
+            if (server != null && server.IsRunning())
+            {
+                server.NotifyHostLeavingAndStop(client.userName);
+            }
+            client.isHost = false;
+            client.DisconnectWithoutLeave();
+        }
+        else
+        {
+            client.Disconnect();
+        }
+
+        UnityEngine.SceneManagement.SceneManager.LoadScene(client.lobbySceneName);
     }
 
     void HandleRaceRestart()

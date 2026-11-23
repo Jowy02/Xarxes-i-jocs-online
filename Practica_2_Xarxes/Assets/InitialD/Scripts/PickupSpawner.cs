@@ -17,12 +17,27 @@ public class PickupSpawner : MonoBehaviour
         client = NewSocketsUDPClient.Instance;
         NewSocketsUDPClient.OnPickupCreated += SpawnPickup;
         NewSocketsUDPClient.OnBoostReceived += ApplyBoost;
+        NewSocketsUDPClient.OnHostMigrationStarted += ClearOldPickupsOnMigration;
     }
 
     void OnDestroy()
     {
         NewSocketsUDPClient.OnPickupCreated -= SpawnPickup;
         NewSocketsUDPClient.OnBoostReceived -= ApplyBoost;
+        NewSocketsUDPClient.OnHostMigrationStarted -= ClearOldPickupsOnMigration;
+    }
+
+    void ClearOldPickupsOnMigration(string _, bool __, bool ___)
+    {
+        BoostPickupNetObject[] oldPickups = FindObjectsByType<BoostPickupNetObject>(FindObjectsSortMode.None);
+        for (int i = 0; i < oldPickups.Length; i++)
+        {
+            if (client != null && client.LinkingContext != null)
+            {
+                client.LinkingContext.Unregister(oldPickups[i].id);
+            }
+            Destroy(oldPickups[i].gameObject);
+        }
     }
 
     void SpawnPickup(int id)

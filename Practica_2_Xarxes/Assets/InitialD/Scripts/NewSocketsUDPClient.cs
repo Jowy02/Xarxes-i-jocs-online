@@ -57,9 +57,10 @@ public class NewSocketsUDPClient : MonoBehaviour
 
     public static event Action<UDPPlayer.CarNetworkState> OnCarTransformReceived;
     public static event Action<int> OnCarDestroyed;
+    public static event Action OnPlayersListUpdated;
     public static event Action OnRaceRestarted;
     public static event Action OnStartCountdownReceived;
-    public static event Action<string, bool> OnHostMigrationStarted;
+    public static event Action<string, bool, bool> OnHostMigrationStarted;
 
     public static event Action<int> OnPickupCreated;
     public static event Action<int> OnBoostReceived;
@@ -118,6 +119,11 @@ public class NewSocketsUDPClient : MonoBehaviour
         DisconnectInternal(true);
     }
 
+    public void DisconnectWithoutLeave()
+    {
+        DisconnectInternal(false);
+    }
+
     void DisconnectInternal(bool sendLeave)
     {
         if (!m_running && m_socket == null) return;
@@ -138,6 +144,9 @@ public class NewSocketsUDPClient : MonoBehaviour
         if (!m_isMigrating)
         {
             m_players.Clear();
+            m_racePlayerIds.Clear();
+            m_roster.Clear();
+            m_localPlayerId = -1;
         }
 
         Debug.Log("[CLIENT] Stopped");
@@ -236,7 +245,7 @@ public class NewSocketsUDPClient : MonoBehaviour
         }
     }
 
-    void HandleHostLost()
+    void HandleHostLost(bool hostLeftVoluntarily = false, string lostHostName = "")
     {
         if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "RaceTrack" || isHost)
         {
@@ -262,10 +271,10 @@ public class NewSocketsUDPClient : MonoBehaviour
             return;
         }
 
-        StartCoroutine(HostMigrationRoutine(nextHost.Value));
+        StartCoroutine(HostMigrationRoutine(nextHost.Value, hostLeftVoluntarily, lostHostName));
     }
 
-    IEnumerator HostMigrationRoutine(RosterEntry newHost)
+    IEnumerator HostMigrationRoutine(RosterEntry newHost, bool hostLeftVoluntarily, string lostHostName)
     {
         m_isMigrating = true;
         m_migrationDeadline = Time.realtimeSinceStartup + 12f;
@@ -282,13 +291,21 @@ public class NewSocketsUDPClient : MonoBehaviour
             OnCarDestroyed?.Invoke(lostHostId);
         }
 
-        AddLocalChatMessage("[SYSTEM] Host connection lost! Searching for a new host...");
+        if (hostLeftVoluntarily)
+        {
+            string displayName = string.IsNullOrEmpty(lostHostName) ? "Host" : lostHostName;
+            AddLocalChatMessage("[SYSTEM] Host (" + displayName + ") left the race! Migrating host...");
+        }
+        else
+        {
+            AddLocalChatMessage("[SYSTEM] Host connection lost! Searching for a new host...");
+        }
         AddLocalChatMessage("[SYSTEM] Assigning new host: " + newHost.name + "...");
 
         DisconnectInternal(false);
 
         bool iAmNewHost = (newHost.id == m_localPlayerId);
-        OnHostMigrationStarted?.Invoke(newHost.name, iAmNewHost);
+        OnHostMigrationStarted?.Invoke(newHost.name, iAmNewHost, hostLeftVoluntarily);
 
         if (iAmNewHost)
         {
@@ -363,10 +380,14 @@ public class NewSocketsUDPClient : MonoBehaviour
             {
                 if (go != null)
                 {
+                    bool isCar = go.GetComponent<CarNetObject>() != null;
                     LinkingContext.Unregister(id);
                     Destroy(go);
-                    m_racePlayerIds.Remove(id);
-                    OnCarDestroyed?.Invoke(id);
+                    if (isCar)
+                    {
+                        m_racePlayerIds.Remove(id);
+                        OnCarDestroyed?.Invoke(id);
+                    }
                 }
                 continue;
             }
@@ -423,7 +444,8 @@ public class NewSocketsUDPClient : MonoBehaviour
             }
             else
             {
-                reader.ReadBytes(29);
+                if (type == (byte)UDPPlayer.ObjectType.Car) reader.ReadBytes(CarNetObject.DataSize);
+                else reader.ReadBytes(BoostPickupNetObject.DataSize);
             }
         }
     }
@@ -468,6 +490,7 @@ public class NewSocketsUDPClient : MonoBehaviour
                 }
             }
 
+            OnPlayersListUpdated?.Invoke();
             Debug.Log("[CLIENT] Players: " + names);
             return;
         }
@@ -501,16 +524,14 @@ public class NewSocketsUDPClient : MonoBehaviour
             return;
         }
 
-        if (message.StartsWith("DISC:"))
+        if (message.StartsWith("HOST_LEFT:"))
         {
-            string playerText = message.Substring(5);
-            string[] parts = playerText.Split(',');
-            if (m_racePlayerIds.Count > 0)
+            string hostName = message.Substring(10).Trim();
+            if (!m_isMigrating)
             {
-                GameObject temp = GameObject.Find(parts[0]);
-                GameObject.Destroy(temp);
-                m_racePlayerIds.Remove(int.Parse(parts[1]));
+                HandleHostLost(true, hostName);
             }
+            return;
         }
 
         if (message.StartsWith("CHAT:"))

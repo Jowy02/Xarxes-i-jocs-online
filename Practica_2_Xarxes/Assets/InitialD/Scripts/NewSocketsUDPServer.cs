@@ -150,6 +150,7 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         // Destroy the lost host car
         m_srv.markDestroy(oldHostId);
+        SpawnPickupsFromScene();
 
         StopCoroutine(nameof(MigrationResumeRoutine));
         StartCoroutine(MigrationResumeRoutine(newHostName));
@@ -193,6 +194,31 @@ public class NewSocketsUDPServer : MonoBehaviour
         if (m_replicationManager != null) m_replicationManager.Reset();
 
         Log("[SERVER] Stopped");
+    }
+
+    public bool IsRunning()
+    {
+        return m_running;
+    }
+
+    public void NotifyHostLeavingAndStop(string hostName)
+    {
+        if (!m_running || m_socket == null) return;
+
+        byte[] body = Encoding.UTF8.GetBytes("HOST_LEFT:" + hostName);
+        byte[] payload = new byte[body.Length + 1];
+        payload[0] = (byte)UDPPlayer.MsgType.Text;
+        Buffer.BlockCopy(body, 0, payload, 1, body.Length);
+
+        lock (m_knownClients)
+        {
+            foreach (EndPoint client in m_knownClients)
+            {
+                try { m_socket.SendTo(payload, client); } catch { }
+            }
+        }
+
+        Disconnect();
     }
 
     void OnDestroy()
@@ -252,15 +278,15 @@ public class NewSocketsUDPServer : MonoBehaviour
 
     void Tick()
     {
-        if (race_start)
+        if (!race_start) return;
+
+        foreach (UDPPlayer play in m_players)
         {
-            foreach (UDPPlayer play in m_players)
-            {
-                if (play.hasReceivedTransform)
-                    m_srv.markUpdate(play.id);
-            }
-            m_pickups.Tick(m_players);
+            if (play.hasReceivedTransform)
+                m_srv.markUpdate(play.id);
         }
+        m_pickups.Tick(m_players);
+
         byte[] pack = m_srv.write();
         foreach (EndPoint client in m_knownClients)
         {
@@ -717,15 +743,15 @@ public class NewSocketsUDPServer : MonoBehaviour
     void RemovePlayer(EndPoint endpoint)
     {
         lock (m_lastSeen) m_lastSeen.Remove(endpoint);
-
         lock (m_knownClients) m_knownClients.Remove(endpoint);
-        string carToRemove = "";
-        int playersId = -1;
+
+        string leavingName = null;
         for (int i = 0; i < m_players.Count; i++)
         {
             if (m_players[i].endpoint.Equals(endpoint))
             {
-                Log("[SERVER] Player left: " + m_players[i].name);
+                leavingName = m_players[i].name;
+                Log("[SERVER] Player left: " + leavingName);
                 if (race_start)
                 {
                     m_srv.markDestroy(m_players[i].id);
@@ -735,7 +761,11 @@ public class NewSocketsUDPServer : MonoBehaviour
             }
         }
 
-        Broadcast("DISC:" + carToRemove + "," + playersId);
+        if (!string.IsNullOrEmpty(leavingName) && race_start)
+        {
+            Broadcast("CHAT:[SYSTEM] " + leavingName + " left the race.");
+        }
+
         SendPlayerList();
         SendRoster();
     }
@@ -761,10 +791,8 @@ public class NewSocketsUDPServer : MonoBehaviour
         race_start = false;
     }
 
-    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    void SpawnPickupsFromScene()
     {
-        if (scene.name != "RaceTrack") return;
-
         List<Vector3> positions = new List<Vector3>();
 
         foreach (GameObject spawn in GameObject.FindGameObjectsWithTag("PickupSpawn"))
@@ -774,5 +802,11 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         m_pickups.StartRound(positions);
         Log("[SERVER] Pickups spawned: " + positions.Count);
+    }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (scene.name != "RaceTrack") return;
+        SpawnPickupsFromScene();
     }
 }
