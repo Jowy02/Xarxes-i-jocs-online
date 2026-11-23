@@ -189,6 +189,7 @@ public class NewSocketsUDPServer : MonoBehaviour
         if (race_start)
         {
             foreach (UDPPlayer play in m_players) m_srv.markUpdate(play.id);
+            m_pickups.Tick(m_players);
         }
         byte[] pack = m_srv.write();
         foreach (EndPoint client in m_knownClients)
@@ -339,6 +340,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             }
 
             Broadcast(startMessage);
+            foreach (UDPPlayer play in m_players) play.hasState = false;
             race_start = true;
             return;
         }
@@ -366,6 +368,8 @@ public class NewSocketsUDPServer : MonoBehaviour
             m_bestLapTime = float.MaxValue;
             Broadcast("RESTART_RACE:");
             Broadcast("START_COUNTDOWN:5");
+            foreach (UDPPlayer play in m_players) play.hasState = false;
+            m_pickups.Restart();
             race_start = true;
 
             return;
@@ -387,6 +391,7 @@ public class NewSocketsUDPServer : MonoBehaviour
                     play.carNetworkState.rotation = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
                     play.carNetworkState.isDrifting = reader.ReadBoolean();
                     play.carNetworkState.skinId = reader.ReadInt32();
+                    play.hasState = true;
                     break;
                 }
             }
@@ -561,6 +566,7 @@ public class NewSocketsUDPServer : MonoBehaviour
         m_standings.Clear();
         m_bestLapName = "";
         m_bestLapTime = float.MaxValue;
+        m_pickups.Clear();
         race_start = false;
     }
 

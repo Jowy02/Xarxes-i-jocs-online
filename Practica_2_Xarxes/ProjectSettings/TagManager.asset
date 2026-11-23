@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Checkpoint
   - Car_
+  - PickupSpawn
   layers:
   - Default
   - TransparentFX

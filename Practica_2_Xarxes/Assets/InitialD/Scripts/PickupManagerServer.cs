@@ -12,6 +12,7 @@ public class PickupManagerServer
     private readonly Dictionary<int, BoostPickupState> m_pickups = new Dictionary<int, BoostPickupState>();
     private readonly List<(Vector3 position, float time)> m_respawns = new List<(Vector3, float)>();
     private int m_nextId = FirstPickupId;
+    private List<Vector3> m_spawnPositions = new List<Vector3>();
 
     public PickupManagerServer(ReplicationManagerServer replication)
     {
@@ -26,8 +27,8 @@ public class PickupManagerServer
 
     public void StartRound(List<Vector3> positions)
     {
-        Clear();
-        foreach (Vector3 position in positions) Spawn(position);
+        m_spawnPositions = new List<Vector3>(positions);
+        Restart();
     }
 
     public void Clear()
@@ -35,6 +36,12 @@ public class PickupManagerServer
         foreach (int id in m_pickups.Keys) m_replication.MarkDestroy(id);
         m_pickups.Clear();
         m_respawns.Clear();
+    }
+
+    public void Restart()
+    {
+        Clear();
+        foreach (Vector3 position in m_spawnPositions) Spawn(position);
     }
 
     public void Tick(List<UDPPlayer> players)
