@@ -31,12 +31,17 @@
 4. **Starting the Race:**
    * The **Host** clicks the **"Start Race"** button.
    * A synchronized network command triggers all connected clients to load the circuit scene (`RaceTrack`) simultaneously.
-5. **Race Controls:**
+5. **Race Keyboard Controls:**
    * **W / S**: Throttle / Reverse
    * **A / D**: Steer Left / Steer Right
    * **Space Bar**: Handbrake & Drift (triggers tire smoke particles and skid marks)
+   * **C**: Toggle in-game race chat
+   * **M**: Toggle in-game menu
+5. **Race Controller Controls:**
+   * **RT / LT**: Throttle / Reverse
+   * **Joystick**: Steer Left / Steer Right
+   * **Circle button**: Handbrake & Drift (triggers tire smoke particles and skid marks)
    * **Chat Button On Sceen**: Toggle in-game race chat
-
 ---
 
 ## 🗺️ 2. Main Scene Structure
@@ -87,37 +92,47 @@ Events like `START_RACE:`, `RESTART_RACE:`, `LAP:`, `YOUR_ID:` only happen once.
 
 We wanted to deliver a polished and engaging multiplayer experience with greater depth and complexity, so we implemented several extra features:
 
-1. **Hereditary Host:** When a host would disconnect in the middle of a game, we used to disconnect all the players. However, in this new version, we've changed that so that another player becomes the new host and the game continues as usual.
+1. **Hereditary Host:** Previously, whenever the host disconnected during a game, all players were disconnected, forcing the session to end. In this new version, we have implemented a host migration system that automatically assigns a new host when the current one disconnects. This allows the game to continue without interrupting the remaining players' experience.
+   
 <p align="center">
 <img src="Gifs/Image_InGame/Full movement.png" width="50%" alt="TCP Chat">
 </p>
 
-2. **Unique Car:** Every player will a have a unique color for its car based on the starting position, which will help them recognize the other players' cars.
+2. **Unique Car:** Each player's car is now assigned a unique color based on their starting position. This makes it easier to identify and distinguish between players cars during a race, improving visibility and the overall multiplayer experience.
+   
 <p align="center">
 <img src="Gifs/Image_InGame/Drifting.png" width="50%" alt="TCP Chat">
 </p>
 
-3. **Ingame UI:** We've added new features as well as a cleaner UI, replacing the buttons that were in the middle of the screen with drop-down menus:
-    * Chat: Press the C key to show or hide it.
-    * Menu: Press the M key to show or hide it. Here, you'll find the button to leave the game and the “Restart Race” button, which only the host can use.
+3. **Ingame UI:** We have redesigned the in-game interface, introducing new features and a cleaner layout. The buttons previously displayed in the middle of the screen have been replaced with drop-down menus, making the interface less intrusive and easier to navigate.
+The new interface includes:
+
+    * Chat: Press the C key to show or hide the chat window.
+    * Menu: Press the M key to show or hide the menu. From here, players can leave the game, while the host also has access to the Restart Race button.
 <p align="center">
 <img src="Gifs/Image_InGame/Drifting.png" width="50%" alt="TCP Chat">
 </p>
 
-4. **Speedometer:**
+4. **Speedometer:** We have added a speedometer to the in-game interface, allowing players to monitor their vehicle's current speed in km/h. This provides useful real-time feedback while driving and makes the racing experience more immersive.
 <p align="center">
 <img src="Gifs/Image_InGame/Drifting.png" width="50%" alt="TCP Chat">
 </p>
 
-5. **Visual Standings:**
+5. **Visual Standings:** Although a standings system was already implemented in the previous version, players could only see the final results once the race was over. We have improved this system by introducing real-time standings, allowing players to monitor everyone's progress throughout the race, including their current position and completed laps. 
 <p align="center">
 <img src="Gifs/Image_InGame/Drifting.png" width="50%" alt="TCP Chat">
 </p>
 
-6. **New lobby visuals:**
+6. **New lobby visuals:** We have maintained all the functionality of the previous lobby versions while giving it a completely new visual design. The updated layout makes it easier for players to understand where everything is located and interact with the available options. Additionally, the new visuals give the lobby a more distinctive identity and add a personal touch to the game.
 <p align="center">
 <img src="Gifs/Image_InGame/Drifting.png" width="50%" alt="TCP Chat">
 </p>
+
+7. **Controller Inputs:** We have added controller support, allowing players to choose between keyboard and controller inputs whenever they want. To prevent input conflicts, the game automatically switches between input devices rather than allowing both to control the car simultaneously. The system handles the following situations automatically:
+
+    * Controller connected: The game switches to controller input, disabling keyboard controls for driving.
+    * Controller disconnected during a race: The game automatically switches back to keyboard controls.
+    * Controller reconnected: The game switches back to controller input.
 
 ---
 
@@ -125,72 +140,27 @@ We wanted to deliver a polished and engaging multiplayer experience with greater
 
 Compared with the previous delivery, this version introduces a multiplayer car race.
 
-- **Lobby to race transition:** The host can request a race start from the lobby. The server distributes the participant IDs and clients load `RaceTrack` while keeping their network connections active.
-
-- **Player identification and starting grid:** The server assigns each player a unique ID. Each client creates one car per participant, using the same player list and spawn point order. Car creation supports multiple participants, currently with a maximum of 12.
-
-- **Local controls and camera:** Each player controls only their own car and their camera follows it. Input controllers are disabled on remote cars.
-
-- **Binary vehicle serialization:** Car movement replaces the previous JSON position messages with `NetworkSerializer`. Each 30-byte payload contains the message type, object ID, three position values, three Euler rotation values and a drifting flag. Pitch, yaw and roll are transmitted, allowing remote cars to reproduce slopes and banked turns.
-
-- **Networked car movement:** Cars replace the previous capsule minigame. Each client sends its car state approximately 20 times per second over UDP. The server forwards these updates to the other clients, which smoothly move and rotate the corresponding remote cars towards the received state.
-
-- **In-race chat:** The UDP chat is available in `RaceTrack`, so players can communicate without returning to the lobby. Race announcements and results also use the chat log.
+- **:** .
 
 ---
 
 ## 🐛 7. Known Bugs / Limitations
-* If a player disconnects abruptly by force-closing the game window (Alt+F4) without using the disconnect option, their car will remain stationary on the track until the server's 5-second timeout cleans it up.
-* Severe packet loss caused by an unstable Wi-Fi connection may result in interpolation drift, causing cars to appear to slide around corners until the next packet arrives.
-* The in-game chat does not adapt to different screen resolutions or aspect ratios and needs further visual refinement.
-* Lap counts should be displayed in the main UI rather than only in the chat.
-* Game loop and lobby navigation require further improvements. Server disconnection, lobby exit, and return-to-main-menu functionality are not yet fully implemented.
-* If a player keeps holding any movement key (W, A, S or D) during a race restart, their car may continue moving or turning after returning to its starting position.
-
+* 
 ---
 
 ## 👥 8. Team Members & Contributions
 
 * **Ana Alcaraz ([Audra0000](https://github.com/Audra0000)):**  
   Worked on:
-  * Ported the UDP chat system (originally developed by Joel for the lobby) and its Canvas UI to the `RaceTrack` scene.
-  * Added the `RaceChatUI` script to adapt the chat to the race scene.
-  * Race-end flow: 30 second countdown after the first winner, then all players return to the waiting room.
-  * Post-race results: final standings and fastest lap shown in the lobby chat.
 
 * **Arthur Cordoba ([000Arthur](https://github.com/000Arthur)):**  
   Worked on:
-  * Initial UDP-based chat system for lobby and in-game player communication.
-  * Local turn indicator UI system with trigger-based activation.
-  * Design and creation of 2D textures for directional arrows.
-  * Map collision and track boundary improvements.
-  * Asset placement adjustments.
 
 * **Haosheng Li ([HaosLii](https://github.com/HaosLii)):**  
   Worked on: 
-  * Improved the UDP lobby interface.
-  * Player ID assignment and distribution of the race participant list.
-  * Spawning one car per player at the assigned starting position.
-  * Sending local car states and applying received updates to remote cars.
 
 * **Pablo Sanjose ([XXPabloS](https://github.com/XXPabloS)):**  
   Worked on:
-  * RaceTrack Scene and built the circuit.
-  * Start Race Button for host and the synchronized scene loading trigger.
-  * Starting grid spawn points car system.
-  * Capsule Minigame removed.
-  * Fix on serialization and Capsule Minigame removed, replacing JSON text with native binary serialization.
-  * Jitter Removal with Vector3.Lerp and Quaternion.Slerp interpolation.
-  * Restart Race functionality.
-  * Drift Marks.
 
 * **Joel Vicente ([Jowy02](https://github.com/Jowy02)):**  
   Worked on:
-  * Integrated Prometheus car asset and adapted the vehicle controller script.
-  * Camera control script.
-  * UDP chat system for both the lobby and in-game communication, including code and Canvas UI.
-  * First iteration of message serialization using JSON, including message type identification.
-  * Lap counter and race-winning conditions.
-  * Removal of disconnected players' cars from the other players' scenes.
-  
-
