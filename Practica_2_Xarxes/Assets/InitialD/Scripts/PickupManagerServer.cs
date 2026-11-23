@@ -63,7 +63,7 @@ public class PickupManagerServer
         {
             foreach (UDPPlayer player in players)
             {
-                if (!player.hasState) continue;
+                if (!player.hasReceivedTransform) continue;
 
                 if (Vector3.Distance(player.carNetworkState.position, pickup.position) < PickupRadius)
                 {

@@ -373,7 +373,7 @@ public class NewSocketsUDPClient : MonoBehaviour
 
             byte type = reader.ReadByte(); // type 0 = Car
 
-            if (id == m_localPlayerId || go == null)
+            if (id == m_localPlayerId)
             {
                 reader.ReadBytes(CarNetObject.DataSize);
                 continue;

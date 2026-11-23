@@ -85,7 +85,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     {
         if (m_replicationManager != null) return;
         m_replicationManager = new ReplicationManagerServer(this);
-        m_pickups = new PickupManagerServer(s, this);
+        m_pickups = new PickupManagerServer(m_replicationManager, this);
         m_srv = new ServerOps
         {
             markCreate = m_replicationManager.MarkCreate,
@@ -457,7 +457,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             }
 
             Broadcast(startMessage);
-            foreach (UDPPlayer play in m_players) play.hasState = false;
+            foreach (UDPPlayer play in m_players) play.hasReceivedTransform = false;
             race_start = true;
             return;
         }
@@ -489,7 +489,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             m_bestLapTime = float.MaxValue;
             Broadcast("RESTART_RACE:");
             Broadcast("START_COUNTDOWN:5");
-            foreach (UDPPlayer play in m_players) play.hasState = false;
+            foreach (UDPPlayer play in m_players) play.hasReceivedTransform = false;
             m_pickups.Restart();
             race_start = true;
 
