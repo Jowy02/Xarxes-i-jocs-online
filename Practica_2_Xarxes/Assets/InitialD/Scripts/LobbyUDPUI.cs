@@ -13,7 +13,8 @@ public class LobbyUDPUI : MonoBehaviour
     [SerializeField] private TMPro.TMP_Text roleText;
     [SerializeField] private TMPro.TMP_InputField nameInput;
     [SerializeField] private TMPro.TMP_InputField ipInput;
-    [SerializeField] private TMPro.TMP_Text playersText;
+    [SerializeField] private TMPro.TMP_Text playersColumn1;
+    [SerializeField] private TMPro.TMP_Text playersColumn2;
 
     // ROLE COLORS
     [Header("Role Colors")]
@@ -68,6 +69,7 @@ public class LobbyUDPUI : MonoBehaviour
         UpdateChatUI();
         UpdateChatLog();
         UpdateRoleText();
+        UpdatePlayersList();
     }
 
     void Update()
@@ -99,7 +101,7 @@ public class LobbyUDPUI : MonoBehaviour
             connectionFailed = true;
 
         UpdateLobbyUI();
-        playersText.text = client.GetPlayerNames();
+        UpdatePlayersList();
         UpdateChatLog();
 
         startRaceButton.SetActive(isInLobby && client.isHost);
@@ -155,6 +157,39 @@ public class LobbyUDPUI : MonoBehaviour
             roleText.text = "Not Connected";
             roleText.color = disconnectedColor;
         }
+    }
+
+    // PLAYERS LIST
+    void UpdatePlayersList()
+    {
+        if (client == null || playersColumn1 == null || playersColumn2 == null) return;
+
+        string playerNames = client.GetPlayerNames();
+
+        if (string.IsNullOrEmpty(playerNames))
+        {
+            playersColumn1.text = "";
+            playersColumn2.text = "";
+            return;
+        }
+
+        string[] players = playerNames.Split('\n');
+
+        int maxPlayersPerColumn = 6;
+
+        List<string> column1 = new List<string>();
+        List<string> column2 = new List<string>();
+
+        for (int i = 0; i < players.Length; i++)
+        {
+            if (i < maxPlayersPerColumn)
+                column1.Add(players[i]);
+            else if (i < maxPlayersPerColumn * 2)
+                column2.Add(players[i]);
+        }
+
+        playersColumn1.text = string.Join("\n", column1);
+        playersColumn2.text = string.Join("\n", column2);
     }
 
     // CHAT UI
@@ -346,7 +381,8 @@ public class LobbyUDPUI : MonoBehaviour
         UpdateLobbyUI();
         UpdateChatUI();
 
-        playersText.text = "";
+        playersColumn1.text = "";
+        playersColumn2.text = "";
         roleText.text = "Not Connected";
         roleText.color = disconnectedColor;
         startRaceButton.SetActive(false);
