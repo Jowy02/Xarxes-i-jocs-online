@@ -61,6 +61,9 @@ public class NewSocketsUDPClient : MonoBehaviour
     public static event Action OnStartCountdownReceived;
     public static event Action<string, bool> OnHostMigrationStarted;
 
+    public static event Action<int> OnPickupCreated;
+    public static event Action<int> OnBoostReceived;
+
     public LinkingContext LinkingContext { get; } = new LinkingContext();
     private int m_lastSequence = -1;
 
@@ -177,6 +180,17 @@ public class NewSocketsUDPClient : MonoBehaviour
                     r.ReadByte();
                     ReadPacket(r);
                     break;
+
+                case UDPPlayer.MsgType.Boost:
+                    var reader = new BinaryReader(new MemoryStream(data));
+                    reader.ReadByte();
+                    int pickupId = reader.ReadInt32();
+                    Debug.Log("[CLIENT] Boost from pickup " + pickupId);
+                    if (OnBoostReceived != null)
+                    {
+                        OnBoostReceived.Invoke(pickupId);
+                    }
+                break;
 
                 default:
                     Debug.Log("[SERVER] Uknown message type: " + data[0]);
@@ -361,7 +375,25 @@ public class NewSocketsUDPClient : MonoBehaviour
 
             if (id == m_localPlayerId || go == null)
             {
-                reader.ReadBytes(29); // skip its data: 6 floats + bool + int
+                reader.ReadBytes(CarNetObject.DataSize);
+                continue;
+            }
+
+            // If the object is not found and its a pickup, trigger the event to create it
+            if (go == null && type == (byte)UDPPlayer.ObjectType.BoostPickup)
+            {
+                if (OnPickupCreated != null)
+                {
+                    OnPickupCreated.Invoke(id);
+                }
+                go = LinkingContext.Find(id);
+            }
+
+            // If the object is not found, skip the data for this object
+            if (go == null)
+            {
+                if (type == (byte)UDPPlayer.ObjectType.Car) reader.ReadBytes(CarNetObject.DataSize);         // skip 29 bytes
+                else reader.ReadBytes(BoostPickupNetObject.DataSize); // skip 12 bytes
                 continue;
             }
 

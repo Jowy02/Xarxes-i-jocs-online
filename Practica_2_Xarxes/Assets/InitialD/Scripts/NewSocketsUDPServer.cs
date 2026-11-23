@@ -9,6 +9,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class NewSocketsUDPServer : MonoBehaviour
 {
@@ -50,10 +51,6 @@ public class NewSocketsUDPServer : MonoBehaviour
     private float m_endRaceTime = -1f;
     private string m_bestLapName = "";
     private float m_bestLapTime = float.MaxValue;
-    // =============================================================================================
-    // START / STOP
-    // =============================================================================================
-
     public class ServerOps
     {
         public Action<int> markCreate, markUpdate, markDestroy;
@@ -63,11 +60,23 @@ public class NewSocketsUDPServer : MonoBehaviour
     private ReplicationManagerServer m_replicationManager;
     float m_nextTick;
 
+    PickupManagerServer m_pickups;
+
+    public BoostPickupState FindPickup(int id)
+    {
+        return m_pickups.Find(id);
+    }
+
+    // =============================================================================================
+    // START / STOP
+    // =============================================================================================
+
     void Start()
     {
         InitReplicationManager();
 
         if (Instance != this) return;
+        SceneManager.sceneLoaded += OnSceneLoaded;
         Application.runInBackground = true;
         if (autoStart) StartNetwork();
     }
@@ -76,6 +85,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     {
         if (m_replicationManager != null) return;
         m_replicationManager = new ReplicationManagerServer(this);
+        m_pickups = new PickupManagerServer(s, this);
         m_srv = new ServerOps
         {
             markCreate = m_replicationManager.MarkCreate,
@@ -188,6 +198,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     void OnDestroy()
     {
         if (Instance == this) Instance = null;
+        SceneManager.sceneLoaded -= OnSceneLoaded;
         Disconnect();
     }
 
@@ -248,6 +259,7 @@ public class NewSocketsUDPServer : MonoBehaviour
                 if (play.hasReceivedTransform)
                     m_srv.markUpdate(play.id);
             }
+            m_pickups.Tick(m_players);
         }
         byte[] pack = m_srv.write();
         foreach (EndPoint client in m_knownClients)
@@ -445,6 +457,7 @@ public class NewSocketsUDPServer : MonoBehaviour
             }
 
             Broadcast(startMessage);
+            foreach (UDPPlayer play in m_players) play.hasState = false;
             race_start = true;
             return;
         }
@@ -476,6 +489,8 @@ public class NewSocketsUDPServer : MonoBehaviour
             m_bestLapTime = float.MaxValue;
             Broadcast("RESTART_RACE:");
             Broadcast("START_COUNTDOWN:5");
+            foreach (UDPPlayer play in m_players) play.hasState = false;
+            m_pickups.Restart();
             race_start = true;
 
             return;
@@ -547,6 +562,17 @@ public class NewSocketsUDPServer : MonoBehaviour
             m_sim.Send(payload, client);
         }
         catch { }
+    }
+
+    // Tells the player that they have picked up a boost
+    public void SendBoost(UDPPlayer player, int pickupId)
+    {
+        MemoryStream stream = new MemoryStream();
+        BinaryWriter writer = new BinaryWriter(stream);
+        writer.Write((byte)UDPPlayer.MsgType.Boost);
+        writer.Write(pickupId);
+
+        m_sim.Send(stream.ToArray(), player.endpoint);
     }
 
     // =============================================================================================
@@ -731,6 +757,22 @@ public class NewSocketsUDPServer : MonoBehaviour
         m_standings.Clear();
         m_bestLapName = "";
         m_bestLapTime = float.MaxValue;
+        m_pickups.Clear();
         race_start = false;
+    }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (scene.name != "RaceTrack") return;
+
+        List<Vector3> positions = new List<Vector3>();
+
+        foreach (GameObject spawn in GameObject.FindGameObjectsWithTag("PickupSpawn"))
+        {
+            positions.Add(spawn.transform.position);
+        }
+
+        m_pickups.StartRound(positions);
+        Log("[SERVER] Pickups spawned: " + positions.Count);
     }
 }

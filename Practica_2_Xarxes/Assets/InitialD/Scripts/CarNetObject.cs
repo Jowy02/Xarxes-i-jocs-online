@@ -3,6 +3,8 @@ using UnityEngine;
 
 public class CarNetObject : NetObject
 {
+    public const int DataSize = 29; // 6 floats + bool + int
+
     public bool isDrifting;
     public int skinId;
 
