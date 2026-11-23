@@ -162,8 +162,10 @@ public class PrometeoCarController : MonoBehaviour
      private int totalLaps = 3;
      private int laps = 1;
      private NewSocketsUDPClient client;
-    private float lapStartTime;
-    private bool finished = false;
+     private float lapStartTime;
+     private bool finished = false;
+
+     private bool controllerCon = false;
 
     // Start is called before the first frame update
     void Start()
@@ -266,6 +268,19 @@ public class PrometeoCarController : MonoBehaviour
             Debug.LogWarning(ex);
           }
         }
+        InvokeRepeating("CheeckControllerCon", 0f, 1f);
+    }
+    void CheeckControllerCon()
+    {
+        foreach (string name in Input.GetJoystickNames())
+        {
+            if (!string.IsNullOrEmpty(name))
+            {
+                controllerCon = true;
+                return;
+            }
+        }
+        controllerCon = false;
     }
 
     void OnEnable()
@@ -336,50 +351,95 @@ public class PrometeoCarController : MonoBehaviour
           ResetSteeringAngle();
         }
 
-      }else{
-
-        if(Input.GetKey(KeyCode.W)){
-          CancelInvoke("DecelerateCar");
-          deceleratingCar = false;
-          GoForward();
-        }
-        if(Input.GetKey(KeyCode.S)){
-          CancelInvoke("DecelerateCar");
-          deceleratingCar = false;
-          GoReverse();
-        }
-
-        if(Input.GetKey(KeyCode.A)){
-          TurnLeft();
-        }
-        if(Input.GetKey(KeyCode.D)){
-          TurnRight();
-        }
-        if(Input.GetKey(KeyCode.Space)){
-          CancelInvoke("DecelerateCar");
-          deceleratingCar = false;
-          Handbrake();
-        }
-        if(Input.GetKeyUp(KeyCode.Space)){
-          RecoverTraction();
-        }
-        if((!Input.GetKey(KeyCode.S) && !Input.GetKey(KeyCode.W))){
-          ThrottleOff();
-        }
-        if((!Input.GetKey(KeyCode.S) && !Input.GetKey(KeyCode.W)) && !Input.GetKey(KeyCode.Space) && !deceleratingCar){
-          InvokeRepeating("DecelerateCar", 0f, 0.1f);
-          deceleratingCar = true;
-        }
-        if(!Input.GetKey(KeyCode.A) && !Input.GetKey(KeyCode.D) && steeringAxis != 0f){
-          ResetSteeringAngle();
-        }
-
       }
+      else if (controllerCon){
+        const float deadZone = 0.2f;
+        const float triggerThreshold = 0.1f;
 
+        float stickX = Input.GetAxisRaw("Horizontal");
+        float stickY = Input.GetAxisRaw("Vertical");
+        float accel = Input.GetAxisRaw("Accelerate");
+        float brake = Input.GetAxisRaw("Brake");
 
-      // We call the method AnimateWheelMeshes() in order to match the wheel collider movements with the 3D meshes of the wheels.
-      AnimateWheelMeshes();
+        bool forward =  accel > triggerThreshold;
+        bool reverse =  brake > triggerThreshold;
+        bool left =  stickX < -deadZone;
+        bool right =  stickX > deadZone;
 
+        if (forward){
+            CancelInvoke("DecelerateCar");
+            deceleratingCar = false;
+            GoForward();
+        }
+        if (reverse){
+            CancelInvoke("DecelerateCar");
+            deceleratingCar = false;
+            GoReverse();
+        }
+        if (left){
+            TurnLeft();
+        }
+        if (right){
+            TurnRight();
+        }
+        if (Input.GetKey(KeyCode.JoystickButton1)){
+            CancelInvoke("DecelerateCar");
+            deceleratingCar = false;
+            Handbrake();
+        }
+        if (Input.GetKeyUp(KeyCode.JoystickButton1)){
+            RecoverTraction();
+        }
+        if (!forward && !reverse){
+            ThrottleOff();
+        }
+        if (!forward && !reverse && !Input.GetKey(KeyCode.JoystickButton1) && !deceleratingCar){
+            InvokeRepeating("DecelerateCar", 0f, 0.1f);
+            deceleratingCar = true;
+        }
+        if (!left && !right && steeringAxis != 0f){
+            ResetSteeringAngle();
+        }
+      }
+      else
+      {
+        if (Input.GetKey(KeyCode.W)){
+            CancelInvoke("DecelerateCar");
+            deceleratingCar = false;
+            GoForward();
+        }
+        if (Input.GetKey(KeyCode.S)){
+            CancelInvoke("DecelerateCar");
+            deceleratingCar = false;
+            GoReverse();
+        }
+        if (Input.GetKey(KeyCode.A)){
+            TurnLeft();
+        }
+        if (Input.GetKey(KeyCode.D)){
+            TurnRight();
+        }
+        if (Input.GetKey(KeyCode.Space)){
+            CancelInvoke("DecelerateCar");
+            deceleratingCar = false;
+            Handbrake();
+        }
+        if (Input.GetKeyUp(KeyCode.Space)){
+            RecoverTraction();
+        }
+        if ((!Input.GetKey(KeyCode.S) && !Input.GetKey(KeyCode.W))){
+            ThrottleOff();
+        }
+        if ((!Input.GetKey(KeyCode.S) && !Input.GetKey(KeyCode.W)) && !Input.GetKey(KeyCode.Space) && !deceleratingCar){
+            InvokeRepeating("DecelerateCar", 0f, 0.1f);
+            deceleratingCar = true;
+        }
+        if (!Input.GetKey(KeyCode.A) && !Input.GetKey(KeyCode.D) && steeringAxis != 0f){
+            ResetSteeringAngle();
+        }
+      }
+        // We call the method AnimateWheelMeshes() in order to match the wheel collider movements with the 3D meshes of the wheels.
+        AnimateWheelMeshes();
     }
 
     // This method converts the car speed data from float to string, and then set the text of the UI carSpeedText with this value.
