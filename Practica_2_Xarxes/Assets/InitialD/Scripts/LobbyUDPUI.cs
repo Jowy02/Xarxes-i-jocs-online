@@ -64,6 +64,8 @@ public class LobbyUDPUI : MonoBehaviour
             return;
         }
 
+        chatInput.onSubmit.AddListener(OnChatInputSubmitted);
+
         AddSystemMessage(ChatDisabledMessage);
         UpdateLobbyUI();
         UpdateChatUI();
@@ -206,8 +208,20 @@ public class LobbyUDPUI : MonoBehaviour
                 placeholder.text = enabled ? "Type your message..." : "Chat disabled...";
         }
 
-        if (!enabled) chatInput.text = "";
+        if (!enabled)
+            chatInput.text = "";
+        else
+        {
+            chatInput.Select();
+            chatInput.ActivateInputField();
+        }
+
         UpdateChatLog();
+    }
+
+    void OnChatInputSubmitted(string message)
+    {
+        SendChatMessage();
     }
 
     public void SendChatMessage()
