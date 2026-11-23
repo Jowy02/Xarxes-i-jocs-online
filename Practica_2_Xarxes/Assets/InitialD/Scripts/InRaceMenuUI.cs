@@ -4,19 +4,24 @@ using UnityEngine.UI;
 
 public class InRaceMenuUI : MonoBehaviour
 {
-    [Header("Menu")]
+    // MENU
     [SerializeField] private RectTransform menuPanel;
     [SerializeField] private float animationSpeed = 10f;
 
-    [Header("Buttons")]
-    [SerializeField] private Button restartRaceButton;
-    [SerializeField] private Button exitRaceButton;
-
-    private RaceSpawner raceSpawner;
     private Vector2 openPosition;
     private Vector2 closedPosition;
     private bool isOpen = false;
 
+    // MENU BUTTONS
+    [SerializeField] private Button restartRaceButton;
+    [SerializeField] private Button settingsButton;
+    [SerializeField] private Button controlsButton;
+    [SerializeField] private Button exitRaceButton;
+
+    // RACE
+    private RaceSpawner raceSpawner;
+
+    // START / UPDATE
     IEnumerator Start()
     {
         raceSpawner = FindFirstObjectByType<RaceSpawner>();
@@ -37,44 +42,37 @@ public class InRaceMenuUI : MonoBehaviour
 
         yield return null;
 
-        if (restartRaceButton != null)
-        {
-            restartRaceButton.gameObject.SetActive(
-                raceSpawner != null && raceSpawner.CanRestartRace
-            );
+        UpdateRestartButton();
 
+        if (restartRaceButton != null)
             restartRaceButton.onClick.AddListener(RestartRace);
-        }
+
+        if (settingsButton != null)
+            settingsButton.interactable = false;
+
+        if (controlsButton != null)
+            controlsButton.interactable = false;
 
         if (exitRaceButton != null)
-        {
             exitRaceButton.onClick.AddListener(ExitRace);
-        }
     }
 
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.M))
-        {
             ToggleMenu();
-        }
 
         AnimateMenu();
     }
 
+    // MENU UI
     public void ToggleMenu()
     {
         isOpen = !isOpen;
-
-        if (restartRaceButton != null)
-        {
-            restartRaceButton.gameObject.SetActive(
-                raceSpawner != null && raceSpawner.CanRestartRace
-            );
-        }
+        UpdateRestartButton();
     }
 
-    private void AnimateMenu()
+    void AnimateMenu()
     {
         if (menuPanel == null) return;
 
@@ -87,7 +85,17 @@ public class InRaceMenuUI : MonoBehaviour
         );
     }
 
-    private void RestartRace()
+    void UpdateRestartButton()
+    {
+        if (restartRaceButton == null) return;
+
+        restartRaceButton.gameObject.SetActive(
+            raceSpawner != null && raceSpawner.CanRestartRace
+        );
+    }
+
+    // RESTART RACE
+    void RestartRace()
     {
         if (raceSpawner == null || !raceSpawner.CanRestartRace)
             return;
@@ -96,7 +104,8 @@ public class InRaceMenuUI : MonoBehaviour
         isOpen = false;
     }
 
-    private void ExitRace()
+    // EXIT RACE
+    void ExitRace()
     {
         if (raceSpawner == null) return;
 
@@ -104,15 +113,13 @@ public class InRaceMenuUI : MonoBehaviour
         raceSpawner.OnClickExitRace();
     }
 
+    // CLEANUP
     void OnDestroy()
     {
         if (restartRaceButton != null)
-        {
             restartRaceButton.onClick.RemoveListener(RestartRace);
-        }
+
         if (exitRaceButton != null)
-        {
             exitRaceButton.onClick.RemoveListener(ExitRace);
-        }
     }
 }
