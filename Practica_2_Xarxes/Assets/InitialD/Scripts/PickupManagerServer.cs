@@ -9,14 +9,16 @@ public class PickupManagerServer
     const float RespawnDelay = 8f;
 
     private readonly ReplicationManagerServer m_replication;
+    private readonly NewSocketsUDPServer m_server;
     private readonly Dictionary<int, BoostPickupState> m_pickups = new Dictionary<int, BoostPickupState>();
     private readonly List<(Vector3 position, float time)> m_respawns = new List<(Vector3, float)>();
     private int m_nextId = FirstPickupId;
     private List<Vector3> m_spawnPositions = new List<Vector3>();
 
-    public PickupManagerServer(ReplicationManagerServer replication)
+    public PickupManagerServer(ReplicationManagerServer replication, NewSocketsUDPServer server)
     {
         m_replication = replication;
+        m_server = server;
     }
 
     public BoostPickupState Find(int id)
@@ -88,5 +90,6 @@ public class PickupManagerServer
         m_pickups.Remove(pickup.id);
         m_respawns.Add((pickup.position, Time.time + RespawnDelay));
         Debug.Log("[SERVER] Pickup " + pickup.id + " collected by " + player.name);
+        m_server.SendBoost(player, pickup.id);
     }
 }

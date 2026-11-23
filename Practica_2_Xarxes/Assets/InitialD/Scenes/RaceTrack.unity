@@ -3754,6 +3754,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PickupSpawner
   boostPickupPrefab: {fileID: 5554323949074044287, guid: 8589a33bb724817449c34b64bcd49eaf, type: 3}
+  raceSpawner: {fileID: 240690351}
 --- !u!4 &333920372
 Transform:
   m_ObjectHideFlags: 0

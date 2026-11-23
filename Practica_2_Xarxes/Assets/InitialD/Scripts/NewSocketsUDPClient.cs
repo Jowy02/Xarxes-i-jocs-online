@@ -45,6 +45,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     public static event Action OnStartCountdownReceived;
 
     public static event Action<int> OnPickupCreated;
+    public static event Action<int> OnBoostReceived;
 
     public LinkingContext LinkingContext { get; } = new LinkingContext();
     private int m_lastSequence = -1;
@@ -74,6 +75,7 @@ public class NewSocketsUDPClient : MonoBehaviour
     {
         if (m_running) return;
         m_localPlayerId = -1;
+        m_lastSequence = -1;
         m_running = true;
         m_lastServerResponse = Time.realtimeSinceStartup;
         m_pingTimer = 0f;
@@ -140,6 +142,17 @@ public class NewSocketsUDPClient : MonoBehaviour
                     var r = new BinaryReader(new MemoryStream(data));
                     r.ReadByte();
                     ReadPacket(r);
+                break;
+
+                case UDPPlayer.MsgType.Boost:
+                    var reader = new BinaryReader(new MemoryStream(data));
+                    reader.ReadByte();
+                    int pickupId = reader.ReadInt32();
+                    Debug.Log("[CLIENT] Boost from pickup " + pickupId);
+                    if (OnBoostReceived != null)
+                    {
+                        OnBoostReceived.Invoke(pickupId);
+                    }
                 break;
 
                 default:

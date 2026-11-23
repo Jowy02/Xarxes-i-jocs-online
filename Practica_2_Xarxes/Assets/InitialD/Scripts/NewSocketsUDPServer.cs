@@ -69,7 +69,7 @@ public class NewSocketsUDPServer : MonoBehaviour
     void Start()
     {
         var s = new ReplicationManagerServer(this);
-        m_pickups = new PickupManagerServer(s);
+        m_pickups = new PickupManagerServer(s, this);
         m_srv = new ServerOps
         {
             markCreate = s.MarkCreate,
@@ -441,6 +441,18 @@ public class NewSocketsUDPServer : MonoBehaviour
         }
         catch { }
     }
+
+    // Tells the player that they have picked up a boost
+    public void SendBoost(UDPPlayer player, int pickupId)
+    {
+        MemoryStream stream = new MemoryStream();
+        BinaryWriter writer = new BinaryWriter(stream);
+        writer.Write((byte)UDPPlayer.MsgType.Boost);
+        writer.Write(pickupId);
+
+        m_sim.Send(stream.ToArray(), player.endpoint);
+    }
+
     // =============================================================================================
     // SERVER NETWORK THREAD
     // =============================================================================================
