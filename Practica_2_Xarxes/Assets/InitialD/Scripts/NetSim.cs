@@ -13,13 +13,18 @@ public class NetSim : MonoBehaviour
 
     readonly List<(float at, byte[] data, EndPoint to)> m_queue = new List<(float, byte[], EndPoint)>();
 
+    public void Clear()
+    {
+        m_queue.Clear();
+    }
+
     public void Send(byte[] data, EndPoint to)
     {
         // lost
         if (Random.value < dropChance) return;
 
         // jitter, may reorder
-        float delay = latency + Random.Range(-jitter, jitter);
+        float delay = Mathf.Max(0f, latency + Random.Range(-jitter, jitter));
         m_queue.Add((Time.time + delay, data, to));
     }
 

@@ -193,6 +193,12 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         if (m_replicationManager != null) m_replicationManager.Reset();
 
+        if (m_sim != null)
+        {
+            m_sim.m_socket = null;
+            m_sim.Clear();
+        }
+
         Log("[SERVER] Stopped");
     }
 
@@ -269,8 +275,12 @@ public class NewSocketsUDPServer : MonoBehaviour
                     Log("[SERVER] Timeout: " + deadClient);
                     RemovePlayer(deadClient);
                 }
-                if (Time.time >= m_nextTick) { m_nextTick = Time.time + 0.05f; Tick(); }
+            }
 
+            if (Time.time >= m_nextTick)
+            {
+                m_nextTick = Time.time + 0.05f;
+                Tick();
             }
         }
         if (m_endRaceTime > 0f && Time.time >= m_endRaceTime) EndRace();

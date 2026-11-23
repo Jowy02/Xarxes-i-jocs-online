@@ -138,6 +138,12 @@ public class NewSocketsUDPClient : MonoBehaviour
             m_socket = null;
         }
 
+        if (m_sim != null)
+        {
+            m_sim.m_socket = null;
+            m_sim.Clear();
+        }
+
         while (m_inbox.TryDequeue(out _)) { }
         m_lastSequence = -1;
 
@@ -147,6 +153,8 @@ public class NewSocketsUDPClient : MonoBehaviour
             m_racePlayerIds.Clear();
             m_roster.Clear();
             m_localPlayerId = -1;
+            LinkingContext.Clear();
+            lock (m_chatlog) m_chatlog.Clear();
         }
 
         Debug.Log("[CLIENT] Stopped");
@@ -178,11 +186,6 @@ public class NewSocketsUDPClient : MonoBehaviour
                     string content = Encoding.UTF8.GetString(data, 1, data.Length - 1);
                     ProcessGameMessage(content);
                     break;
-
-                //case UDPPlayer.MsgType.Transform:
-                //    UDPPlayer.CarNetworkState state = NetworkSerializer.DeserializeCar(data);
-                //    OnCarTransformReceived?.Invoke(state);
-                //break;
 
                 case UDPPlayer.MsgType.Replication:
                     var r = new BinaryReader(new MemoryStream(data));
@@ -585,6 +588,8 @@ public class NewSocketsUDPClient : MonoBehaviour
         if (message == "RETURN_LOBBY:")
         {
             if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "RaceTrack") return;
+            LinkingContext.Clear();
+            m_racePlayerIds.Clear();
             UnityEngine.SceneManagement.SceneManager.LoadScene(lobbySceneName);
             return;
         }

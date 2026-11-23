@@ -30,4 +30,9 @@ public class LinkingContext
     }
 
     public int Count => m_objects.Count;
+    public void Clear()
+    {
+        m_objects.Clear();
+        m_nextId = 1;
+    }
 }

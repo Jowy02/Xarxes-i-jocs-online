@@ -49,7 +49,7 @@ public class NetSimUI : MonoBehaviour
 
         if (open)
         {
-            // Busca los NetSim al abrir (el del cliente y el del servidor)
+            // Find all NetSim components when opening (client and server)
             sims = FindObjectsByType<NetSim>(FindObjectsSortMode.None);
             LoadValues();
         }
@@ -57,7 +57,7 @@ public class NetSimUI : MonoBehaviour
         panel.SetActive(open);
     }
 
-    // Copia los valores actuales del NetSim a los sliders
+    // Copy current NetSim values to the sliders
     private void LoadValues()
     {
         if (sims.Length == 0)
@@ -73,7 +73,7 @@ public class NetSimUI : MonoBehaviour
         UpdateTexts();
     }
 
-    // Copia los valores de los sliders a todos los NetSim
+    // Apply slider values to all NetSim components
     private void ApplyValues()
     {
         foreach (NetSim sim in sims)

@@ -12,12 +12,15 @@ public class PickupSpawner : MonoBehaviour
 
     private NewSocketsUDPClient client;
 
+    private int activeBoostStacks = 0;
+
     void Start()
     {
         client = NewSocketsUDPClient.Instance;
         NewSocketsUDPClient.OnPickupCreated += SpawnPickup;
         NewSocketsUDPClient.OnBoostReceived += ApplyBoost;
         NewSocketsUDPClient.OnHostMigrationStarted += ClearOldPickupsOnMigration;
+        NewSocketsUDPClient.OnRaceRestarted += ResetActiveBoost;
     }
 
     void OnDestroy()
@@ -25,10 +28,14 @@ public class PickupSpawner : MonoBehaviour
         NewSocketsUDPClient.OnPickupCreated -= SpawnPickup;
         NewSocketsUDPClient.OnBoostReceived -= ApplyBoost;
         NewSocketsUDPClient.OnHostMigrationStarted -= ClearOldPickupsOnMigration;
+        NewSocketsUDPClient.OnRaceRestarted -= ResetActiveBoost;
+        ResetActiveBoost();
     }
 
     void ClearOldPickupsOnMigration(string _, bool __, bool ___)
     {
+        ResetActiveBoost();
+
         BoostPickupNetObject[] oldPickups = FindObjectsByType<BoostPickupNetObject>(FindObjectsSortMode.None);
         for (int i = 0; i < oldPickups.Length; i++)
         {
@@ -38,6 +45,22 @@ public class PickupSpawner : MonoBehaviour
             }
             Destroy(oldPickups[i].gameObject);
         }
+    }
+
+    void ResetActiveBoost()
+    {
+        StopAllCoroutines();
+
+        if (activeBoostStacks > 0 && raceSpawner != null && raceSpawner.LocalCar != null)
+        {
+            PrometeoCarController controller = raceSpawner.LocalCar.GetComponent<PrometeoCarController>();
+            if (controller != null)
+            {
+                controller.maxSpeed -= BoostExtraSpeed * activeBoostStacks;
+            }
+        }
+
+        activeBoostStacks = 0;
     }
 
     void SpawnPickup(int id)
@@ -61,12 +84,18 @@ public class PickupSpawner : MonoBehaviour
     {
         PrometeoCarController controller = car.GetComponent<PrometeoCarController>();
         Rigidbody body = car.GetComponent<Rigidbody>();
+        if (controller == null || body == null || body.isKinematic) yield break;
 
+        activeBoostStacks++;
         controller.maxSpeed += BoostExtraSpeed;
         body.AddForce(car.transform.forward * BoostImpulse, ForceMode.VelocityChange);
 
         yield return new WaitForSeconds(BoostDuration);
 
-        if (controller != null) controller.maxSpeed -= BoostExtraSpeed;
+        if (controller != null && activeBoostStacks > 0)
+        {
+            controller.maxSpeed -= BoostExtraSpeed;
+            activeBoostStacks--;
+        }
     }
 }
