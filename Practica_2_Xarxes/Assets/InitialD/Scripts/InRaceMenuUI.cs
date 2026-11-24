@@ -8,9 +8,17 @@ public class InRaceMenuUI : MonoBehaviour
     [SerializeField] private RectTransform menuPanel;
     [SerializeField] private float animationSpeed = 10f;
 
-    private Vector2 openPosition;
-    private Vector2 closedPosition;
-    private bool isOpen = false;
+    private Vector2 menuOpenPosition;
+    private Vector2 menuClosedPosition;
+    private bool isMenuOpen = false;
+
+    // CHAT
+    [SerializeField] private RectTransform chatPanel;
+    [SerializeField] private RaceChatUI raceChatUI;
+
+    private Vector2 chatOpenPosition;
+    private Vector2 chatClosedPosition;
+    private bool isChatOpen = false;
 
     // MENU BUTTONS
     [SerializeField] private Button restartRaceButton;
@@ -21,24 +29,37 @@ public class InRaceMenuUI : MonoBehaviour
     // RACE
     private RaceSpawner raceSpawner;
 
-    // START / UPDATE
     IEnumerator Start()
     {
         raceSpawner = FindFirstObjectByType<RaceSpawner>();
 
-        if (menuPanel == null)
+        if (menuPanel == null || chatPanel == null)
         {
-            Debug.LogError("[RACE MENU] Menu panel is not assigned.");
+            Debug.LogError("[RACE UI] Menu or chat panel is not assigned.");
             enabled = false;
             yield break;
         }
 
+        if (raceChatUI == null)
+            raceChatUI = FindFirstObjectByType<RaceChatUI>();
+
         Canvas.ForceUpdateCanvases();
 
-        openPosition = menuPanel.anchoredPosition;
-        closedPosition = openPosition + Vector2.right * menuPanel.rect.width;
+        // MENU POSITIONS
+        menuOpenPosition = menuPanel.anchoredPosition;
 
-        menuPanel.anchoredPosition = closedPosition;
+        menuClosedPosition =
+            menuOpenPosition + Vector2.right * menuPanel.rect.width;
+
+        menuPanel.anchoredPosition = menuClosedPosition;
+
+        // CHAT POSITIONS
+        chatOpenPosition = chatPanel.anchoredPosition;
+
+        chatClosedPosition =
+            chatOpenPosition + Vector2.left * chatPanel.rect.width;
+
+        chatPanel.anchoredPosition = chatClosedPosition;
 
         yield return null;
 
@@ -62,13 +83,18 @@ public class InRaceMenuUI : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.M))
             ToggleMenu();
 
+        if (Input.GetKeyDown(KeyCode.C))
+            ToggleChat();
+
         AnimateMenu();
+        AnimateChat();
     }
 
     // MENU UI
     public void ToggleMenu()
     {
-        isOpen = !isOpen;
+        isMenuOpen = !isMenuOpen;
+
         UpdateRestartButton();
     }
 
@@ -76,7 +102,8 @@ public class InRaceMenuUI : MonoBehaviour
     {
         if (menuPanel == null) return;
 
-        Vector2 targetPosition = isOpen ? openPosition : closedPosition;
+        Vector2 targetPosition =
+            isMenuOpen ? menuOpenPosition : menuClosedPosition;
 
         menuPanel.anchoredPosition = Vector2.Lerp(
             menuPanel.anchoredPosition,
@@ -94,6 +121,29 @@ public class InRaceMenuUI : MonoBehaviour
         );
     }
 
+    // CHAT UI
+    public void ToggleChat()
+    {
+        isChatOpen = !isChatOpen;
+
+        if (raceChatUI != null)
+            raceChatUI.SetChatInputActive(isChatOpen);
+    }
+
+    void AnimateChat()
+    {
+        if (chatPanel == null) return;
+
+        Vector2 targetPosition =
+            isChatOpen ? chatOpenPosition : chatClosedPosition;
+
+        chatPanel.anchoredPosition = Vector2.Lerp(
+            chatPanel.anchoredPosition,
+            targetPosition,
+            1f - Mathf.Exp(-animationSpeed * Time.unscaledDeltaTime)
+        );
+    }
+
     // RESTART RACE
     void RestartRace()
     {
@@ -101,7 +151,8 @@ public class InRaceMenuUI : MonoBehaviour
             return;
 
         raceSpawner.OnClickHostRestart();
-        isOpen = false;
+
+        isMenuOpen = false;
     }
 
     // EXIT RACE
@@ -109,7 +160,8 @@ public class InRaceMenuUI : MonoBehaviour
     {
         if (raceSpawner == null) return;
 
-        isOpen = false;
+        isMenuOpen = false;
+
         raceSpawner.OnClickExitRace();
     }
 

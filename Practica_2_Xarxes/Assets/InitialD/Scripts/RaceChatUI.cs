@@ -1,65 +1,132 @@
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using System.Collections;
 
 public class RaceChatUI : MonoBehaviour
 {
-    [SerializeField] private TMPro.TMP_Text chatLog;
+    [SerializeField] private TMP_Text chatLog;
     [SerializeField] private ScrollRect chatScroll;
-    [SerializeField] private TMPro.TMP_InputField chatInput;
-    [SerializeField] private GameObject chatPanel;
+    [SerializeField] private TMP_InputField chatInput;
 
     private NewSocketsUDPClient client;
+    private string previousChatText = "";
+    private bool chatInputActive = false;
 
     void Start()
     {
         client = FindFirstObjectByType<NewSocketsUDPClient>();
-        chatPanel.SetActive(false);
-        chatInput.onSubmit.AddListener(_ => SendChatMessage());
+
+        if (chatInput != null)
+        {
+            chatInput.onSubmit.AddListener(OnChatSubmit);
+            chatInput.interactable = false;
+            chatInput.DeactivateInputField();
+        }
     }
 
     void Update()
     {
         if (client == null) return;
+
         UpdateChatLog();
     }
 
-    // Refreshes the chat text and keeps the view at the bottom, unless the player has scrolled up
     void UpdateChatLog()
     {
+        if (chatLog == null) return;
+
         string text = "Chat:\n" + client.GetChatLog();
-        if (chatLog.text == text) return;
+
+        if (previousChatText == text) return;
 
         bool atBottom = true;
 
-        if (chatScroll != null)
+        if (chatScroll != null && chatScroll.content != null)
         {
-            RectTransform viewport = chatScroll.viewport != null ? chatScroll.viewport : (RectTransform)chatScroll.transform;
-            atBottom = chatScroll.content.rect.height <= viewport.rect.height + 1f
-                       || chatScroll.verticalNormalizedPosition <= 0.01f;
+            RectTransform viewport = chatScroll.viewport != null
+                ? chatScroll.viewport
+                : (RectTransform)chatScroll.transform;
+
+            atBottom =
+                chatScroll.content.rect.height <= viewport.rect.height + 1f ||
+                chatScroll.verticalNormalizedPosition <= 0.01f;
         }
 
         chatLog.text = text;
+        previousChatText = text;
 
-        if (chatScroll != null && atBottom)
+        if (atBottom)
+            StartCoroutine(ScrollToBottom());
+    }
+
+    IEnumerator ScrollToBottom()
+    {
+        yield return null;
+
+        Canvas.ForceUpdateCanvases();
+
+        if (chatScroll != null)
         {
-            Canvas.ForceUpdateCanvases();
             chatScroll.verticalNormalizedPosition = 0f;
+            Canvas.ForceUpdateCanvases();
         }
     }
 
-    public void ToggleChat()
+    // CHAT INPUT CONTROL
+
+    public void SetChatInputActive(bool active)
     {
-        chatPanel.SetActive(!chatPanel.activeSelf);
+        chatInputActive = active;
+
+        if (chatInput == null) return;
+
+        chatInput.interactable = active;
+
+        if (active)
+        {
+            chatInput.ActivateInputField();
+            chatInput.Select();
+        }
+        else
+        {
+            chatInput.DeactivateInputField();
+
+            if (EventSystem.current != null &&
+                EventSystem.current.currentSelectedGameObject == chatInput.gameObject)
+            {
+                EventSystem.current.SetSelectedGameObject(null);
+            }
+        }
+    }
+
+    void OnChatSubmit(string value)
+    {
+        if (!chatInputActive) return;
+
+        SendChatMessage();
     }
 
     public void SendChatMessage()
     {
+        if (!chatInputActive || chatInput == null || client == null)
+            return;
+
         string message = chatInput.text.Trim();
-        if (client == null || string.IsNullOrEmpty(message)) return;
+
+        if (string.IsNullOrEmpty(message))
+            return;
 
         client.SendString("CHAT:" + client.userName + ": " + message);
+
         chatInput.text = "";
         chatInput.ActivateInputField();
+    }
+
+    void OnDestroy()
+    {
+        if (chatInput != null)
+            chatInput.onSubmit.RemoveListener(OnChatSubmit);
     }
 }
