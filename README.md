@@ -157,13 +157,13 @@ We wanted to deliver a polished and engaging multiplayer experience with greater
 1. **Hereditary Host:** Previously, whenever the host disconnected during a game, all players were disconnected, forcing the session to end. In this new version, we have implemented a host migration system that automatically assigns a new host when the current one disconnects. This allows the game to continue without interrupting the remaining players' experience.
    
 <p align="center">
-<img src="Gifs/Image_InGame/Full movement.png" width="50%" alt="TCP Chat">
+<img src="Gifs/UI/LostHost.png" width="40%" alt="host">
 </p>
 
 2. **Unique Car:** Each player's car is now assigned a unique color based on their starting position. This makes it easier to identify and distinguish between players cars during a race, improving visibility and the overall multiplayer experience.
    
 <p align="center">
-<img src="Gifs/Image_InGame/Drifting.png" width="50%" alt="TCP Chat">
+<img src="Gifs/UI/UniqueCar.png" width="40%" alt="car">
 </p>
 
 3. **Ingame UI:** We have redesigned the in-game interface, introducing new features and a cleaner layout. The buttons previously displayed in the middle of the screen have been replaced with drop-down menus, making the interface less intrusive and easier to navigate.
@@ -172,27 +172,22 @@ The new interface includes:
     * Chat: Press the C key to show or hide the chat window.
     * Menu: Press the M key to show or hide the menu. From here, players can leave the game, while the host also has access to the Restart Race button.
 <p align="center">
-<img src="Gifs/Image_InGame/Drifting.png" width="50%" alt="TCP Chat">
+<img src="Gifs/UI/IngameUI.png" width="40%" alt="UI">
 </p>
 
 4. **Speedometer:** We have added a speedometer to the in-game interface, allowing players to monitor their vehicle's current speed in km/h. This provides useful real-time feedback while driving and makes the racing experience more immersive.
 <p align="center">
-<img src="Gifs/Image_InGame/Drifting.png" width="50%" alt="TCP Chat">
+<img src="Gifs/UI/Speed.png" width="40%" alt="Speedometer">
 </p>
 
 5. **Sound Effects:** Each car features engine and tire-skid sound effects, which can also be heard by other players depending on their distance from the vehicle. Nitro has its own dedicated sound effect; however, it is only played locally to avoid excessive noise for other players.
 
-6. **Visual Standings:** Although a standings system was already implemented in the previous version, players could only see the final results once the race was over. We have improved this system by introducing real-time standings, allowing players to monitor everyone's progress throughout the race, including their current position and completed laps. 
+6. **New lobby visuals:** We have maintained all the functionality of the previous lobby versions while giving it a completely new visual design. The updated layout makes it easier for players to understand where everything is located and interact with the available options. Additionally, the new visuals give the lobby a more distinctive identity and add a personal touch to the game.
 <p align="center">
-<img src="Gifs/Image_InGame/Drifting.png" width="50%" alt="TCP Chat">
+<img src="Gifs/UI/Lobby.png" width="40%" alt="TCP Chat">
 </p>
 
-7. **New lobby visuals:** We have maintained all the functionality of the previous lobby versions while giving it a completely new visual design. The updated layout makes it easier for players to understand where everything is located and interact with the available options. Additionally, the new visuals give the lobby a more distinctive identity and add a personal touch to the game.
-<p align="center">
-<img src="Gifs/Image_InGame/Drifting.png" width="50%" alt="TCP Chat">
-</p>
-
-8. **Controller Inputs:** We have added controller support, allowing players to choose between keyboard and controller inputs whenever they want. To prevent input conflicts, the game automatically switches between input devices rather than allowing both to control the car simultaneously. The system handles the following situations automatically:
+7. **Controller Inputs:** We have added controller support, allowing players to choose between keyboard and controller inputs whenever they want. To prevent input conflicts, the game automatically switches between input devices rather than allowing both to control the car simultaneously. The system handles the following situations automatically:
 
     * Controller connected: The game switches to controller input, disabling keyboard controls for driving.
     * Controller disconnected during a race: The game automatically switches back to keyboard controls.
@@ -246,17 +241,8 @@ Compared with the previous delivery, this version introduces a multiplayer car r
 
 ## 👥 10. Team Members & Contributions
 
-* **Ana Alcaraz ([Audra0000](https://github.com/Audra0000)):**  
-  Worked on:
-
-* **Arthur Cordoba ([000Arthur](https://github.com/000Arthur)):**  
-  Worked on:
-
-* **Haosheng Li ([HaosLii](https://github.com/HaosLii)):**  
-  Worked on: 
-
-* **Pablo Sanjose ([XXPabloS](https://github.com/XXPabloS)):**  
-  Worked on:
-
-* **Joel Vicente ([Jowy02](https://github.com/Jowy02)):**  
-  Worked on:
+* **Ana Alcaraz ([Audra0000](https://github.com/Audra0000))**  
+* **Arthur Cordoba ([000Arthur](https://github.com/000Arthur))**  
+* **Haosheng Li ([HaosLii](https://github.com/HaosLii))**  
+* **Pablo Sanjose ([XXPabloS](https://github.com/XXPabloS))**  
+* **Joel Vicente ([Jowy02](https://github.com/Jowy02))**  
