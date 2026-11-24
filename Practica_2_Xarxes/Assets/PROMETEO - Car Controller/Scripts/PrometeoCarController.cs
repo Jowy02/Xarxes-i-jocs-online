@@ -167,6 +167,15 @@ public class PrometeoCarController : MonoBehaviour
 
      private bool controllerCon = false;
 
+    // Awake runs even on remote cars, whose controller is disabled before Start ever runs
+    void Awake()
+    {
+      // We save the initial pitch of the car engine sound (used by UpdateSounds).
+      if(carEngineSound != null){
+        initialCarEngineSoundPitch = carEngineSound.pitch;
+      }
+    }
+
     // Start is called before the first frame update
     void Start()
     {
@@ -208,10 +217,6 @@ public class PrometeoCarController : MonoBehaviour
         RRwheelFriction.asymptoteValue = rearRightCollider.sidewaysFriction.asymptoteValue;
         RRwheelFriction.stiffness = rearRightCollider.sidewaysFriction.stiffness;
 
-        // We save the initial pitch of the car engine sound.
-        if(carEngineSound != null){
-          initialCarEngineSoundPitch = carEngineSound.pitch;
-        }
 
         // We invoke 2 methods inside this script. CarSpeedUI() changes the text of the UI object that stores
         // the speed of the car and CarSounds() controls the engine and drifting sounds. Both methods are invoked
@@ -463,21 +468,7 @@ public class PrometeoCarController : MonoBehaviour
     public void CarSounds(){
 
       if(useSounds){
-        try{
-          if(carEngineSound != null){
-            float engineSoundPitch = initialCarEngineSoundPitch + (Mathf.Abs(carRigidbody.linearVelocity.magnitude) / 25f);
-            carEngineSound.pitch = engineSoundPitch;
-          }
-          if((isDrifting) || (isTractionLocked && Mathf.Abs(carSpeed) > 12f)){
-            if(!tireScreechSound.isPlaying){
-              tireScreechSound.Play();
-            }
-          }else if((!isDrifting) && (!isTractionLocked || Mathf.Abs(carSpeed) < 12f)){
-            tireScreechSound.Stop();
-          }
-        }catch(Exception ex){
-          Debug.LogWarning(ex);
-        }
+        UpdateSounds(carRigidbody.linearVelocity.magnitude);
       }else if(!useSounds){
         if(carEngineSound != null && carEngineSound.isPlaying){
           carEngineSound.Stop();
@@ -487,6 +478,27 @@ public class PrometeoCarController : MonoBehaviour
         }
       }
 
+    }
+
+    // Engine pitch and tire screech for a speed in m/s. CarSounds() calls it with the Rigidbody speed
+    // (local car); EnginePitch calls it with the speed worked out from the network position (remote cars).
+    public void UpdateSounds(float speed){
+      try{
+        if(carEngineSound != null){
+          float engineSoundPitch = initialCarEngineSoundPitch + (Mathf.Abs(speed) / 25f);
+          // Move 30% towards the new pitch every call instead of jumping, so the boost doesn't pop
+          carEngineSound.pitch = Mathf.Lerp(carEngineSound.pitch, engineSoundPitch, 0.3f);
+        }
+        if((isDrifting) || (isTractionLocked && Mathf.Abs(carSpeed) > 12f)){
+          if(!tireScreechSound.isPlaying){
+            tireScreechSound.Play();
+          }
+        }else if((!isDrifting) && (!isTractionLocked || Mathf.Abs(carSpeed) < 12f)){
+          tireScreechSound.Stop();
+        }
+      }catch(Exception ex){
+        Debug.LogWarning(ex);
+      }
     }
 
     //

@@ -3716,6 +3716,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PickupSpawner
   boostPickupPrefab: {fileID: 5554323949074044287, guid: 8589a33bb724817449c34b64bcd49eaf, type: 3}
   raceSpawner: {fileID: 240690351}
+  nitroSound: {fileID: 8300000, guid: 7f2d3ce005cd9924ea45f663767232ad, type: 3}
 --- !u!4 &333920372
 Transform:
   m_ObjectHideFlags: 0
@@ -17770,6 +17771,7 @@ MonoBehaviour:
   menuPanel: {fileID: 1664549975}
   animationSpeed: 10
   chatPanel: {fileID: 242536607}
+  raceChatUI: {fileID: 0}
   restartRaceButton: {fileID: 1363315539}
   settingsButton: {fileID: 786129289}
   controlsButton: {fileID: 874913562}

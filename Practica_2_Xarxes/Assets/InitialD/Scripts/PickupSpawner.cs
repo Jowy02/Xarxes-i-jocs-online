@@ -9,6 +9,7 @@ public class PickupSpawner : MonoBehaviour
 
     [SerializeField] private GameObject boostPickupPrefab;
     [SerializeField] private RaceSpawner raceSpawner;
+    [SerializeField] private AudioClip nitroSound;
 
     private NewSocketsUDPClient client;
 
@@ -89,6 +90,12 @@ public class PickupSpawner : MonoBehaviour
         activeBoostStacks++;
         controller.maxSpeed += BoostExtraSpeed;
         body.AddForce(car.transform.forward * BoostImpulse, ForceMode.VelocityChange);
+
+        // Nitro Sound sfx
+        if (nitroSound != null && controller.carEngineSound != null)
+        {
+            controller.carEngineSound.PlayOneShot(nitroSound);
+        }
 
         yield return new WaitForSeconds(BoostDuration);
 
