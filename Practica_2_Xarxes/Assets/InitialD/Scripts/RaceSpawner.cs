@@ -15,11 +15,12 @@ public class RaceSpawner : MonoBehaviour
 
     // Client and local player info
     [SerializeField] private TMPro.TMP_Text countdownText;
+    [SerializeField] private GameObject controlsTutorialPanel;
 
     // Host Migration UI
     [SerializeField] private GameObject migrationBWOverlay;
     [SerializeField] private TMPro.TMP_Text migrationStatusText;
-    [SerializeField] private TMPro.TMP_Text playersHudText;
+    [SerializeField] private TMPro.TMP_Text playersHUDText;
 
     private NewSocketsUDPClient client;
     private int localPlayerId = -1;
@@ -55,7 +56,7 @@ public class RaceSpawner : MonoBehaviour
 
         if (migrationBWOverlay != null) migrationBWOverlay.SetActive(false);
         if (migrationStatusText != null) migrationStatusText.gameObject.SetActive(false);
-        RefreshPlayersHud();
+        RefreshPlayersHUD();
 
         if ((!testMode && client == null) || carPrefab == null || cameraFollow == null)
         {
@@ -131,7 +132,7 @@ public class RaceSpawner : MonoBehaviour
         NewSocketsUDPClient.OnFinishCountdown += ShowFinishCountdown;
         NewSocketsUDPClient.OnStartCountdownReceived += HandleStartCountdown;
         NewSocketsUDPClient.OnHostMigrationStarted += HandleHostMigrationStarted;
-        NewSocketsUDPClient.OnPlayersListUpdated += RefreshPlayersHud;
+        NewSocketsUDPClient.OnPlayersListUpdated += RefreshPlayersHUD;
     }
 
     void OnDisable()
@@ -142,7 +143,7 @@ public class RaceSpawner : MonoBehaviour
         NewSocketsUDPClient.OnFinishCountdown -= ShowFinishCountdown;
         NewSocketsUDPClient.OnStartCountdownReceived -= HandleStartCountdown;
         NewSocketsUDPClient.OnHostMigrationStarted -= HandleHostMigrationStarted;
-        NewSocketsUDPClient.OnPlayersListUpdated -= RefreshPlayersHud;
+        NewSocketsUDPClient.OnPlayersListUpdated -= RefreshPlayersHUD;
     }
 
     void OnDestroy()
@@ -258,14 +259,14 @@ public class RaceSpawner : MonoBehaviour
         cars.Remove(carId);
         targetPositions.Remove(carId);
         targetRotations.Remove(carId);
-        RefreshPlayersHud();
+        RefreshPlayersHUD();
     }
 
-    void RefreshPlayersHud()
+    void RefreshPlayersHUD()
     {
-        if (playersHudText != null && client != null)
+        if (playersHUDText != null && client != null)
         {
-            playersHudText.text = client.GetPlayerNames();
+            playersHUDText.text = client.GetPlayerNames();
         }
     }
 
@@ -293,7 +294,7 @@ public class RaceSpawner : MonoBehaviour
         if (countdownText != null) countdownText.gameObject.SetActive(false);
         if (migrationBWOverlay != null) migrationBWOverlay.SetActive(true);
 
-        RefreshPlayersHud();
+        RefreshPlayersHUD();
         StartCoroutine(MigrationTextStagesRoutine(newHostName, iAmNewHost, hostLeftVoluntarily));
     }
 
@@ -372,6 +373,15 @@ public class RaceSpawner : MonoBehaviour
             migrationStatusText.text = "RESUMING RACE...";
         }
 
+        // CONTROLS TUTORIAL
+        if (controlsTutorialPanel != null)
+        {
+            controlsTutorialPanel.SetActive(true);
+            yield return new WaitForSeconds(5f);
+            controlsTutorialPanel.SetActive(false);
+        }
+
+        // START COUNTDOWN
         int count = 5;
 
         while (count > 0)
@@ -407,7 +417,7 @@ public class RaceSpawner : MonoBehaviour
             localController.enabled = true;
         }
 
-        RefreshPlayersHud();
+        RefreshPlayersHUD();
 
         yield return new WaitForSeconds(1f);
 
