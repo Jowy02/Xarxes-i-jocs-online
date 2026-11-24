@@ -28,6 +28,9 @@ public class NewSocketsUDPServer : MonoBehaviour
     private int m_hostPlayerId = 0;
     private bool m_waitingMigrationRejoin = false;
     private int m_expectedSurvivorsCount = 0;
+    private bool m_raceCountdownSent = false;
+    private int m_countdownToken = 0;
+    private int m_restartToken = 0;
 
     const int MaxPacketSize = 64 * 1024;
 
@@ -170,7 +173,8 @@ public class NewSocketsUDPServer : MonoBehaviour
         SendPlayerList();
         SendRoster();
         Broadcast("CHAT:[SYSTEM] New host assigned: " + newHostName + ". Resuming race!");
-        Broadcast("START_COUNTDOWN:5");
+        m_countdownToken++;
+        BroadcastReliable("START_COUNTDOWN:" + m_countdownToken);
     }
 
     public void Disconnect()
@@ -179,6 +183,7 @@ public class NewSocketsUDPServer : MonoBehaviour
         m_running = false;
         race_start = false;
         m_waitingMigrationRejoin = false;
+        m_raceCountdownSent = false;
 
         if (m_socket != null)
         {
@@ -477,6 +482,7 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         if (text.StartsWith("START_RACE:"))
         {
+            if (race_start) return;
             if (m_replicationManager != null) m_replicationManager.Reset();
             SendRoster();
 
@@ -492,7 +498,8 @@ public class NewSocketsUDPServer : MonoBehaviour
                 startMessage += m_players[i].id;
             }
 
-            Broadcast(startMessage);
+            m_raceCountdownSent = false;
+            BroadcastReliable(startMessage);
             foreach (UDPPlayer play in m_players) play.hasReceivedTransform = false;
             race_start = true;
             return;
@@ -500,9 +507,11 @@ public class NewSocketsUDPServer : MonoBehaviour
 
         if (text.StartsWith("READY_FOR_COUNTDOWN:"))
         {
-            if (!m_waitingMigrationRejoin)
+            if (!m_waitingMigrationRejoin && !m_raceCountdownSent)
             {
-                Broadcast("START_COUNTDOWN:5");
+                m_raceCountdownSent = true;
+                m_countdownToken++;
+                BroadcastReliable("START_COUNTDOWN:" + m_countdownToken);
             }
             return;
         }
@@ -523,8 +532,10 @@ public class NewSocketsUDPServer : MonoBehaviour
             m_endRaceTime = -1f;
             m_bestLapName = "";
             m_bestLapTime = float.MaxValue;
-            Broadcast("RESTART_RACE:");
-            Broadcast("START_COUNTDOWN:5");
+            m_restartToken++;
+            m_countdownToken++;
+            BroadcastReliable("RESTART_RACE:" + m_restartToken);
+            BroadcastReliable("START_COUNTDOWN:" + m_countdownToken);
             foreach (UDPPlayer play in m_players) play.hasReceivedTransform = false;
             m_pickups.Restart();
             race_start = true;
@@ -581,6 +592,21 @@ public class NewSocketsUDPServer : MonoBehaviour
                     try { m_sim.Send(rawData, client); } catch { }
                 }
             }
+        }
+    }
+
+    void BroadcastReliable(string message, int repeats = 5, float interval = 0.2f)
+    {
+        StartCoroutine(BroadcastRepeatedRoutine(message, repeats, interval));
+    }
+
+    IEnumerator BroadcastRepeatedRoutine(string message, int repeats, float interval)
+    {
+        for (int i = 0; i < repeats; i++)
+        {
+            if (!m_running) yield break;
+            Broadcast(message);
+            if (i < repeats - 1) yield return new WaitForSecondsRealtime(interval);
         }
     }
 

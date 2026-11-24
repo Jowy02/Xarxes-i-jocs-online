@@ -41,6 +41,8 @@ public class RaceSpawner : MonoBehaviour
 
     private float sendTimer = 0f;
     private bool raceStarted = false;
+    private bool countdownStarted = false;
+    private bool tutorialShown = false;
 
     void Start()
     {
@@ -118,9 +120,10 @@ public class RaceSpawner : MonoBehaviour
     IEnumerator TriggerServerCountdownDelay()
     {
         yield return new WaitForSeconds(0.5f);
-        if (client != null && client.IsRunning())
+        while (!countdownStarted && client != null && client.IsRunning())
         {
             client.SendString("READY_FOR_COUNTDOWN:");
+            yield return new WaitForSeconds(0.5f);
         }
     }
 
@@ -274,6 +277,8 @@ public class RaceSpawner : MonoBehaviour
     {
         if (testMode) return;
 
+        if (controlsTutorialPanel != null) controlsTutorialPanel.SetActive(false);
+
         StopAllCoroutines();
         raceStarted = false;
 
@@ -351,6 +356,7 @@ public class RaceSpawner : MonoBehaviour
     {
         if (testMode) return;
 
+        countdownStarted = true;
         StopAllCoroutines();
         StartCoroutine(StartCountdownRoutine());
     }
@@ -374,8 +380,10 @@ public class RaceSpawner : MonoBehaviour
         }
 
         // CONTROLS TUTORIAL
-        if (controlsTutorialPanel != null)
+        // CONTROLS TUTORIAL
+        if (!tutorialShown && controlsTutorialPanel != null)
         {
+            tutorialShown = true;
             controlsTutorialPanel.SetActive(true);
             yield return new WaitForSeconds(5f);
             controlsTutorialPanel.SetActive(false);
@@ -466,6 +474,8 @@ public class RaceSpawner : MonoBehaviour
     void HandleRaceRestart()
     {
         if (testMode) return;
+
+        if (controlsTutorialPanel != null) controlsTutorialPanel.SetActive(false);
 
         StopAllCoroutines();
         raceStarted = false;

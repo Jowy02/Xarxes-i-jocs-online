@@ -54,6 +54,9 @@ public class NewSocketsUDPClient : MonoBehaviour
     private bool m_waitingWelcome = false;
     private float m_rejoinRetryTimer = 0f;
     private float m_migrationDeadline = 0f;
+    private int m_lastCountdownToken = -1;
+    private int m_lastRestartToken = -1;
+    private bool m_loadingRace = false;
 
     public static event Action<UDPPlayer.CarNetworkState> OnCarTransformReceived;
     public static event Action<int> OnCarDestroyed;
@@ -99,6 +102,9 @@ public class NewSocketsUDPClient : MonoBehaviour
             m_racePlayerIds.Clear();
             m_roster.Clear();
             m_currentHostId = 0;
+            m_lastCountdownToken = -1;
+            m_lastRestartToken = -1;
+            m_loadingRace = false;
         }
 
         m_lastSequence = -1;
@@ -550,11 +556,12 @@ public class NewSocketsUDPClient : MonoBehaviour
 
         if (message.StartsWith("START_RACE:"))
         {
-            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "RaceTrack")
+            if (m_loadingRace || UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == "RaceTrack")
             {
                 return;
             }
 
+            m_loadingRace = true;
             m_lastSequence = -1;
             string idsText = message.Substring(11);
             string[] receivedIds = idsText.Split(',');
@@ -567,6 +574,7 @@ public class NewSocketsUDPClient : MonoBehaviour
 
                 if (!int.TryParse(receivedIds[i], out playerId))
                 {
+                    m_loadingRace = false;
                     m_racePlayerIds.Clear();
                     Debug.LogError("[CLIENT] Invalid race player list");
                     return;
@@ -587,6 +595,7 @@ public class NewSocketsUDPClient : MonoBehaviour
 
         if (message == "RETURN_LOBBY:")
         {
+            m_loadingRace = false;
             if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "RaceTrack") return;
             LinkingContext.Clear();
             m_racePlayerIds.Clear();
@@ -596,6 +605,13 @@ public class NewSocketsUDPClient : MonoBehaviour
 
         if (message.StartsWith("RESTART_RACE:"))
         {
+            int token;
+            if (int.TryParse(message.Substring(13), out token))
+            {
+                if (token == m_lastRestartToken) return;
+                m_lastRestartToken = token;
+            }
+
             Debug.Log("[CLIENT] Race restarted by host.");
             m_lastSequence = -1;
             OnRaceRestarted?.Invoke();
@@ -604,6 +620,13 @@ public class NewSocketsUDPClient : MonoBehaviour
 
         if (message.StartsWith("START_COUNTDOWN:"))
         {
+            int token;
+            if (int.TryParse(message.Substring(16), out token))
+            {
+                if (token == m_lastCountdownToken) return;
+                m_lastCountdownToken = token;
+            }
+
             m_isMigrating = false;
             m_waitingWelcome = false;
             m_lastSequence = -1;
